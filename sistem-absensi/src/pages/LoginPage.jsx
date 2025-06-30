@@ -1,60 +1,54 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { daftarPekerja } from '../data/dummyData';
+import axios from 'axios';
 
 const LoginPage = () => {
-  const [idPekerja, setIdPekerja] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const { loginAction } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError('');
 
-    // Cari pekerja berdasarkan ID
-    const user = daftarPekerja.find((p) => p.id === idPekerja);
+    try {
+      // Kirim permintaan login ke backend
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
+        email,
+        password,
+      });
 
-    if (!user) {
-      setError('ID Pekerja tidak ditemukan');
-      return;
-    }
+      // Simpan data user & token via context
+      loginAction(response.data);
 
-    if (user.password !== password) {
-      setError('Password salah');
-      return;
-    }
+      // Redirect berdasarkan role
+      const userRole = response.data.user.role;
 
-    // Simulasi response API
-    const dummyResponseData = {
-      token: `token-${user.id}`,
-      user: {
-        id: user.id,
-        name: user.nama,
-        role: user.role,
-        jabatan: user.jabatan,
-      },
-    };
-
-    // Panggil login dari context
-    loginAction(dummyResponseData);
-
-    // Redirect berdasarkan role
-    switch (user.role) {
-      case 'Supervisor':
-        navigate('/supervisor/dashboard');
-        break;
-      case 'Pekerja':
-        navigate('/pekerja/profil');
-        break;
-      case 'Manager':
-      case 'Direktur':
-        navigate('/admin/dashboard');
-        break;
-      default:
-        navigate('/');
+      switch (userRole) {
+        case 'Supervisor':
+          navigate('/supervisor/dashboard');
+          break;
+        case 'Pekerja':
+          navigate('/pekerja/profil');
+          break;
+        case 'Manager':
+          navigate('/admin/dashboard');
+          break;
+        case 'Direktur':
+          navigate('/admin/dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    } catch (err) {
+      // Tampilkan pesan error dari server atau fallback
+      const errorMessage =
+        err.response?.data?.message || 'Login gagal. Periksa kembali email atau kata sandi.';
+      setError(errorMessage);
     }
   };
 
@@ -64,38 +58,42 @@ const LoginPage = () => {
         <h1 className="text-2xl font-bold text-center mb-6">Login Sistem Absensi Pekerja</h1>
 
         <form onSubmit={handleLogin} className="space-y-4">
+          {/* Email Input */}
           <div>
-            <label htmlFor="idPekerja" className="block text-sm font-medium text-gray-700">
-              ID Pekerja
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              Email
             </label>
             <input
-              id="idPekerja"
-              type="text"
-              value={idPekerja}
-              onChange={(e) => setIdPekerja(e.target.value)}
-              placeholder="Masukkan ID seperti P001"
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Masukkan email Anda"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               required
             />
           </div>
 
+          {/* Password Input */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
+              Kata Sandi
             </label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Masukkan password"
+              placeholder="Masukkan kata sandi"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               required
             />
           </div>
 
+          {/* Error Message */}
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
+          {/* Submit Button */}
           <button
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition duration-200"
