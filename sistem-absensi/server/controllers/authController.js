@@ -1,65 +1,73 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const logActivity = require('../services/logService');
 
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required.' });
+    return res.status(400).json({ message: 'Email dan kata sandi diperlukan.' });
   }
 
   try {
-    // Based on your ERD: Pengguna -> Pekerja
+    // Query untuk mendapatkan data pengguna aktif beserta informasi pekerja dan peran
     const [users] = await pool.query(
-      `SELECT 
-        p.id_pengguna, p.password_hash, pr.nama_peran, 
-        pk.id_pekerja, p.nama_pengguna, jpk.nama_pekerjaan
-       FROM pengguna p
-       JOIN peran pr ON p.id_peran = pr.id_peran
-       LEFT JOIN pekerja pk ON p.id_pengguna = pk.id_pengguna
-       LEFT JOIN jenis_pekerjaan jpk ON pk.id_jenis_pekerjaan = jpk.id_jenis_pekerjaan
-       WHERE p.email = ? AND p.status_pengguna = 'Aktif'`,
-      [email]
+        `SELECT
+           p.id_pengguna, p.password_hash, pr.nama_peran,
+           pk.id_pekerja, p.nama_pengguna, jpk.nama_pekerjaan
+         FROM pengguna p
+                JOIN peran pr ON p.id_peran = pr.id_peran
+                LEFT JOIN pekerja pk ON p.id_pengguna = pk.id_pengguna
+                LEFT JOIN jenis_pekerjaan jpk ON pk.id_jenis_pekerjaan = jpk.id_jenis_pekerjaan
+         WHERE p.email = ? AND p.status_pengguna = 'Aktif'`,
+        [email]
     );
 
     if (users.length === 0) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+      return res.status(401).json({ message: 'Kredensial tidak valid.' });
     }
 
     const user = users[0];
 
-    // Verify password
+    // Verifikasi password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+      return res.status(401).json({ message: 'Kredensial tidak valid.' });
     }
 
-    // Create a payload for the token
+    // Buat payload token JWT
     const payload = {
       user: {
         id: user.id_pengguna,
         role: user.nama_peran,
-        name: user.nama_pengguna
-      }
+        name: user.nama_pengguna,
+      },
     };
 
-    // Sign the JWT
+    // Generate JWT
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    // Return the token and user info to the client
+    // Catat aktivitas login
+    await logActivity(
+        user.id_pengguna,
+        'LOGIN',
+        `User ${user.nama_pengguna} berhasil login.`,
+        req
+    );
+
+    // Kirim respons dengan token dan info pengguna
     res.json({
       token,
       user: {
-        id: user.id_pekerja, // From Pekerja table
+        id: user.id_pekerja || user.id_pengguna,
         name: user.nama_pengguna,
         role: user.nama_peran,
-        jabatan: user.nama_pekerjaan,
+        jabatan: user.nama_pekerjaan || null,
       },
     });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).send('Server error');
+    console.error('Error saat login:', error);
+    res.status(500).json({ message: 'Terjadi kesalahan server.' });
   }
 };

@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import HalamanAbsensi from './pages/HalamanAbsensi';
 import ValidasiIzin from './pages/ValidasiIzin';
+import PengajuanIzin from './pages/PengajuanIzin';
 import PekerjaProfile from './pages/PekerjaProfile'; // Profil pekerja nyata
 import AdminDashboard from './pages/AdminDashboard'; // Dashboard admin/direktur nyata
 import UnauthorizedPage from './pages/UnauthorizedPage'; // Halaman 403
@@ -41,7 +42,15 @@ function App() {
           {/* Rute Publik */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
-
+          {/*  Rute Bersama kecuali Direktur untuk Pengajuan Izin Cuti */}
+          <Route
+              path="/pengajuan-izin"
+              element={
+                  <ProtectedRoute allowedRoles={['Pekerja', 'Supervisor', 'Manager']}>
+                      <PengajuanIzin />
+                  </ProtectedRoute>
+              }
+          />
           {/* Rute Supervisor */}
           <Route
             path="/supervisor/dashboard"
