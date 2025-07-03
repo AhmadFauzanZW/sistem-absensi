@@ -81,21 +81,30 @@ const AdminDashboard = () => {
 
     // Handle action untuk persetujuan izin
     const handleAction = async (id_pengajuan, aksi) => {
+        let catatan = '';
+
+        if (aksi === 'tolak') {
+            let alasan = '';
+            do {
+                alasan = window.prompt('Mohon masukkan alasan penolakan:');
+                if (alasan === null) return;
+            } while (!alasan.trim());
+            catatan = alasan;
+        } else {
+            const catatanOpsional = window.prompt('Tambahkan catatan (opsional):', 'Disetujui');
+            if (catatanOpsional === null) return;
+            catatan = catatanOpsional;
+        }
+
         try {
             const token = localStorage.getItem('token');
-            await axios.put(
-                `http://localhost:5000/api/izin/${id_pengajuan}/proses`,
-                { aksi },
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
+            await axios.put(`http://localhost:5000/api/izin/${id_pengajuan}/proses`,
+                { aksi, catatan }, // <-- KIRIM 'catatan' DI SINI
+                { headers: { Authorization: `Bearer ${token}` } }
             );
-
-            // Refresh data izin setelah update
-            fetchIzinData();
-        } catch (err) {
-            console.error(`Gagal memproses izin (${aksi}):`, err);
-            alert(`Gagal memproses izin. ${err.response?.data?.message || 'Silakan coba lagi.'}`);
+            fetchIzinData(); // Refresh list
+        } catch (error) {
+            alert(`Gagal memproses. ${error.response?.data?.message || ''}`);
         }
     };
 

@@ -32,19 +32,39 @@ const ValidasiIzin = () => {
 
   // Kirim aksi ke API
   const handleAction = async (id_pengajuan, aksi) => {
+    let catatan = '';
+
+    if (aksi === 'tolak') {
+      // Jika menolak, wajib mengisi alasan. Loop sampai diisi.
+      let alasan = '';
+      do {
+        alasan = window.prompt('Mohon masukkan alasan penolakan:');
+        if (alasan === null) return; // User menekan tombol "Cancel", batalkan aksi
+      } while (!alasan.trim()); // Terus bertanya jika alasan kosong atau hanya spasi
+      catatan = alasan;
+    } else { // Jika menyetujui
+      // Tampilkan prompt dengan nilai default, bersifat opsional
+      const catatanOpsional = window.prompt('Tambahkan catatan (opsional):', 'Disetujui');
+      if (catatanOpsional === null) return; // User menekan tombol "Cancel", batalkan aksi
+      catatan = catatanOpsional;
+    }
+
+    // Lanjutkan kirim data ke API
     try {
+      setLoading(true); // Opsional: tampilkan loading saat proses
       const token = localStorage.getItem('token');
       await axios.put(
           `http://localhost:5000/api/izin/${id_pengajuan}/proses`,
-          { aksi }, // 'setuju' atau 'tolak'
+          { aksi, catatan }, // <-- KIRIM 'catatan' DI SINI
           { headers: { Authorization: `Bearer ${token}` } }
       );
-
       // Refresh list setelah berhasil update
       fetchIzinUntukValidasi();
     } catch (error) {
       console.error(`Gagal memproses izin (${aksi}):`, error);
       alert(`Gagal memproses izin. ${error.response?.data?.message || 'Silakan coba lagi.'}`);
+    } finally {
+      setLoading(false); // Opsional
     }
   };
 
