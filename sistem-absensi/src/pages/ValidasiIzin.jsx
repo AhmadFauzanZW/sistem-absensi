@@ -88,10 +88,10 @@ const ValidasiIzin = () => {
                       <p className="mt-3 text-gray-700 text-sm">Alasan: {izin.keterangan}</p>
 
                       {/* Lampiran (jika ada) */}
-                      {izin.lampiranUrl && (
+                      {izin.file_bukti_path && (
                           <div className="mt-4">
                             <a
-                                href={izin.lampiranUrl}
+                                href={`http://localhost:5000/uploads/${izin.file_bukti_path}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="w-full md:w-auto text-center bg-gray-200 text-gray-700 px-3 py-2 text-sm rounded hover:bg-gray-300 transition"

@@ -16,6 +16,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/kehadiran', require('./routes/kehadiran'));
 app.use('/api/logs', require('./routes/log'));
 app.use('/api/izin', require('./routes/izin'));
+app.use('/api/proyek', require('./routes/proyek'));
 // Add other routes here later, e.g.,
 // app.use('/api/workers', require('./routes/workers'));
 
