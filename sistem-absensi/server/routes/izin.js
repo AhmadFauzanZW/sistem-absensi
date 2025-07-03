@@ -1,7 +1,7 @@
 // server/routes/izin.js
 const express = require('express');
 const router = express.Router();
-const { ajukanIzin, getIzinUntukValidasi, prosesValidasi } = require('../controllers/izinController');
+const { ajukanIzin, getIzinUntukValidasi, prosesValidasi, getRiwayatIzin } = require('../controllers/izinController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../uploadConfig');
 
@@ -14,5 +14,7 @@ router.get('/validasi', protect, authorize('Supervisor', 'Manager', 'Direktur'),
 // PUT /api/izin/:id_pengajuan/proses - Memproses persetujuan/penolakan
 router.put('/:id_pengajuan/proses', protect, authorize('Supervisor', 'Manager', 'Direktur'), prosesValidasi);
 
+// GET /api/izin/riwayat - Mendapatkan riwayat pengajuan izin
+router.get('/riwayat', protect, getRiwayatIzin);
 
 module.exports = router;

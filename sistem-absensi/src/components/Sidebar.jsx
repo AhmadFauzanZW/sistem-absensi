@@ -11,17 +11,20 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     { path: '/supervisor/absensi', label: 'Halaman Absensi' },
     { path: '/supervisor/validasi-izin', label: 'Validasi Izin' },
     { path: '/pengajuan-izin', label: 'Pengajuan Izin', roles: ['Pekerja', 'Supervisor', 'Manager'] },
+    { path: '/riwayat-izin', label: 'Riwayat Izin', roles: ['Pekerja', 'Supervisor', 'Manager', 'Direktur'] },
   ];
 
   const pekerjaMenu = [
     { path: '/pekerja/profil', label: 'Profil & Dashboard' },
     { path: '/pengajuan-izin', label: 'Pengajuan Izin', roles: ['Pekerja', 'Supervisor', 'Manager'] },
+    { path: '/riwayat-izin', label: 'Riwayat Izin', roles: ['Pekerja', 'Supervisor', 'Manager', 'Direktur'] },
     // { path: '/pekerja/izin', label: 'Pengajuan Izin' },
   ];
 
   const adminMenu = [
     { path: '/admin/dashboard', label: 'Dashboard Utama' },
     { path: '/pengajuan-izin', label: 'Pengajuan Izin', roles: ['Pekerja', 'Supervisor', 'Manager'] },
+    { path: '/riwayat-izin', label: 'Riwayat Izin', roles: ['Pekerja', 'Supervisor', 'Manager', 'Direktur'] },
     // { path: '/admin/laporan', label: 'Laporan Proyek' },
     // { path: '/admin/kelola-pekerja', label: 'Kelola Pekerja' },
   ];

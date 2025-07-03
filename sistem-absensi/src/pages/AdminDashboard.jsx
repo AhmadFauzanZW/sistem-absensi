@@ -3,104 +3,80 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
-// Import Dummy Data (untuk Manager)
-import {pengajuanIzinList, pengajuanIzinList as initialIzinList} from '../data/dummyData';
-import { lokasiProyekList } from '../data/dummyData';
-
 const AdminDashboard = () => {
     const { user } = useAuth();
-    const [lokasiTerpilih, setLokasiTerpilih] = useState('semua');
-
-    // State untuk izin manager (dari dummyData)
-    const [izinList, setIzinList] = useState(initialIzinList);
-
-    // State untuk log aktivitas direktur (dari API)
+    const [izinUntukValidasi, setIzinUntukValidasi] = useState([]);
     const [logs, setLogs] = useState([]);
-    const [loadingLogs, setLoadingLogs] = useState(true);
+    const [loading, setLoading] = useState(true);
 
-    // Filter izin yang menunggu persetujuan Manager
-    // const izinUntukManager = izinList.filter(
-    //     (izin) =>
-    //         izin.persetujuan.supervisor === 'Disetujui' &&
-    //         izin.persetujuan.manager === 'Menunggu'
-    // );
+    const fetchIzinData = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get('http://localhost:5000/api/izin/validasi', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setIzinUntukValidasi(response.data);
+        } catch (error) {
+            console.error("Gagal mengambil data validasi izin:", error);
+        }
+    };
 
-    // Fetch log aktivitas dari backend jika role Direktur
     useEffect(() => {
-        if (user?.role === 'Direktur') {
-            const fetchLogs = async () => {
+        const fetchData = async () => {
+            setLoading(true);
+            if (user?.role === 'Manager') {
+                await fetchIzinData();
+            }
+            if (user?.role === 'Direktur') {
+                // Fetch log aktivitas direktur
                 try {
                     const token = localStorage.getItem('token');
-                    const response = await axios.get('http://localhost:5000/api/logs', {
-                        headers: { Authorization: `Bearer ${token}` },
-                    });
-                    setLogs(response.data);
+                    const logRes = await axios.get('http://localhost:5000/api/logs', { headers: { Authorization: `Bearer ${token}` } });
+                    setLogs(logRes.data);
                 } catch (error) {
-                    console.error("Gagal memuat log aktivitas:", error);
-                } finally {
-                    setLoadingLogs(false);
+                    console.error("Gagal mengambil log:", error);
                 }
-            };
+            }
+            setLoading(false);
+        };
+        fetchData();
+    }, [user.role]);
 
-            fetchLogs();
+    const handleAction = async (id_pengajuan, aksi) => {
+        // Logika sama persis dengan di halaman ValidasiIzin.jsx
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`http://localhost:5000/api/izin/${id_pengajuan}/proses`,
+                { aksi }, { headers: { Authorization: `Bearer ${token}` } }
+            );
+            fetchIzinData(); // Refresh list
+        } catch (error) {
+            alert(`Gagal memproses. ${error.response?.data?.message || ''}`);
         }
-    }, [user]);
+    };
+
+    if (loading) return <Layout><p>Loading dashboard...</p></Layout>;
 
     return (
         <Layout>
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-800">Dashboard {user.role}</h1>
+            <h1 className="text-3xl font-bold text-gray-800 mb-6">Dashboard {user.role}</h1>
 
-                {/* Dropdown Lokasi untuk Manager */}
-                {user.role === 'Manager' && (
-                    <div>
-                        <label className="text-sm mr-2">Lokasi Proyek:</label>
-                        <select
-                            onChange={(e) => setLokasiTerpilih(e.target.value)}
-                            className="border-gray-300 rounded-md shadow-sm"
-                        >
-                            <option value="semua">Semua Lokasi</option>
-                            {lokasiProyekList.map((l) => (
-                                <option key={l.id} value={l.id}>
-                                    {l.nama}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-            </div>
-
-            {/* --- KONTEN KHUSUS MANAGER --- */}
+            {/* KONTEN KHUSUS MANAGER */}
             {user.role === 'Manager' && (
-                <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-                    <h2 className="font-semibold text-lg mb-4">Izin Membutuhkan Persetujuan Anda</h2>
-                    {pengajuanIzinList.length > 0 ? (
-                        <div className="space-y-3">
-                            {pengajuanIzinList.map((izin) => (
-                                <div
-                                    key={izin.id}
-                                    className="border p-3 rounded flex justify-between items-center"
-                                >
-                                    <div>
-                                        <p>
-                                            <strong>{izin.namaPekerja}</strong> ({izin.tanggalMulai})
-                                        </p>
-                                        <p className="text-sm">{izin.alasan}</p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition">
-                                            Tolak
-                                        </button>
-                                        <button className="bg-green-100 text-green-700 px-3 py-1 rounded text-sm hover:bg-green-200 transition">
-                                            Setujui
-                                        </button>
-                                    </div>
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h2 className="font-semibold text-lg mb-4">Validasi Izin Menunggu</h2>
+                    <div className="space-y-3">
+                        {izinUntukValidasi.length > 0 ? izinUntukValidasi.map(izin => (
+                            <div key={izin.id_pengajuan} className="border p-4 rounded-md">
+                                <p><span className="font-bold">{izin.nama_lengkap}</span> mengajukan {izin.jenis_izin}.</p>
+                                <p className="text-sm text-gray-600">Status: {izin.status_akhir}</p>
+                                <div className="flex justify-end gap-2 mt-2">
+                                    <button onClick={() => handleAction(izin.id_pengajuan, 'tolak')} className="bg-red-100 text-red-700 px-3 py-1 text-sm rounded">Tolak</button>
+                                    <button onClick={() => handleAction(izin.id_pengajuan, 'setuju')} className="bg-green-100 text-green-700 px-3 py-1 text-sm rounded">Setujui</button>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-gray-500 italic">Tidak ada pengajuan izin yang membutuhkan persetujuan.</p>
-                    )}
+                            </div>
+                        )) : <p>Tidak ada izin yang perlu divalidasi.</p>}
+                    </div>
                 </div>
             )}
 
