@@ -1,155 +1,112 @@
+// src/pages/HalamanAbsensi.jsx
+
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { getInitialAttendanceList } from '../data/dummyData';
+import axios from 'axios';
 
 // Helper untuk styling badge status
 const getStatusBadge = (status) => {
   switch (status) {
-    case 'Hadir':
-      return 'bg-green-100 text-green-800';
-    case 'Terlambat':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'Izin':
-    case 'Sakit':
-      return 'bg-blue-100 text-blue-800';
-    case 'Absen':
-      return 'bg-red-100 text-red-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
+    case 'Hadir': return 'bg-green-100 text-green-800';
+    case 'Telat': return 'bg-yellow-100 text-yellow-800';
+    case 'Izin': return 'bg-blue-100 text-blue-800';
+    case 'Pulang Cepat': return 'bg-purple-100 text-purple-800';
+    case 'Absen': return 'bg-red-100 text-red-800';
+    case 'N/A': return 'bg-gray-100 text-gray-500'; // Untuk hari tanpa data
+    default: return 'bg-gray-100 text-gray-800';
   }
 };
 
 const HalamanAbsensi = () => {
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState(null);
-  const [attendanceList, setAttendanceList] = useState(getInitialAttendanceList());
+  const [absensiMingguan, setAbsensiMingguan] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
 
-  // Efek membersihkan hasil scan setelah beberapa detik
   useEffect(() => {
-    if (scanResult) {
-      const timer = setTimeout(() => {
-        setScanResult(null);
-        setIsScanning(false);
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [scanResult]);
-
-  const handleStartScan = (type) => {
-    setIsScanning(true);
-    setScanResult(null);
-
-    setTimeout(() => {
-      const unAttendedWorkers = attendanceList.filter((p) => p.status === 'Belum Hadir');
-
-      if (unAttendedWorkers.length === 0) {
-        setScanResult({
-          success: false,
-          message: 'Semua pekerja sudah diabsen.',
+    const fetchAbsensiMingguan = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get('http://localhost:5000/api/kehadiran/mingguan', {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { tanggal: selectedDate }
         });
-        return;
+        setAbsensiMingguan(response.data);
+      } catch (error) {
+        console.error("Gagal mengambil data absensi mingguan:", error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const randomPekerja = unAttendedWorkers[Math.floor(Math.random() * unAttendedWorkers.length)];
-      handleManualChangeStatus(randomPekerja.id, 'Hadir');
-
-      setScanResult({
-        success: true,
-        message: `Kehadiran untuk ${randomPekerja.nama} telah dicatat sebagai "Hadir".`,
-      });
-    }, 2000);
-  };
-
-  const handleManualChangeStatus = (pekerjaId, newStatus) => {
-    setAttendanceList((currentList) =>
-      currentList.map((pekerja) =>
-        pekerja.id === pekerjaId ? { ...pekerja, status: newStatus } : pekerja
-      )
-    );
-  };
+    fetchAbsensiMingguan();
+  }, [selectedDate]); // Jalankan kembali setiap kali tanggal pilihan berubah
 
   return (
-    <Layout>
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Pencatatan Kehadiran</h1>
+      <Layout>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Laporan Absensi Mingguan</h1>
 
-      {/* --- BAGIAN SCANNER (PRIORITAS UTAMA) --- */}
-      <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md text-center mb-8">
-        {/* Tampilan Kamera / Hasil Scan */}
-        <div className="w-full max-w-lg mx-auto h-72 bg-gray-900 rounded-lg flex justify-center items-center mb-6 text-white overflow-hidden">
-          {isScanning && !scanResult && <p className="animate-pulse">Mencari Wajah / QR Code...</p>}
-          {!isScanning && <p>Arahkan kamera ke wajah atau QR Code pekerja.</p>}
-          {scanResult && (
-            <div className={`p-4 text-center ${scanResult.success ? 'text-green-400' : 'text-red-400'}`}>
-              <p className="text-2xl font-bold">{scanResult.success ? 'Berhasil' : 'Gagal'}</p>
-              <p>{scanResult.message}</p>
-            </div>
-          )}
+        {/* Filter Tanggal */}
+        <div className="mb-6 flex items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
+          <label htmlFor="week-picker" className="font-medium text-gray-700">Pilih Tanggal untuk Melihat Laporan Mingguan:</label>
+          <input
+              type="date"
+              id="week-picker"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="border-gray-300 rounded-md shadow-sm"
+          />
         </div>
 
-        {/* Tombol Aksi */}
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-          <button
-            onClick={() => handleStartScan('QR')}
-            disabled={isScanning}
-            className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:bg-blue-700 disabled:bg-gray-400"
-          >
-            Scan QR Code
-          </button>
-          <button
-            onClick={() => handleStartScan('Wajah')}
-            disabled={isScanning}
-            className="w-full sm:w-auto bg-teal-600 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:bg-teal-700 disabled:bg-gray-400"
-          >
-            Gunakan Pengenalan Wajah
-          </button>
+        {/* Bagian Aksi Absen (akan diimplementasikan nanti) */}
+        <div className="bg-white p-6 rounded-lg shadow-md text-center mb-8">
+          <h2 className="text-xl font-semibold mb-4">Pencatatan Kehadiran (Clock-In / Clock-Out)</h2>
+          <p className="text-gray-500 mb-4">Fitur Scan QR dan Pengenalan Wajah akan diimplementasikan pada tahap selanjutnya.</p>
+          <div className="flex justify-center gap-4">
+            <button disabled className="bg-gray-400 text-white px-8 py-3 rounded-lg font-semibold text-lg cursor-not-allowed">Scan QR Code</button>
+            <button disabled className="bg-gray-400 text-white px-8 py-3 rounded-lg font-semibold text-lg cursor-not-allowed">Gunakan Pengenalan Wajah</button>
+          </div>
         </div>
-      </div>
 
-      {/* --- BAGIAN DAFTAR PEKERJA (BACKUP & MONITORING) --- */}
-      <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Daftar Kehadiran Pekerja Hari Ini</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Gunakan daftar ini untuk memantau status dan melakukan perubahan manual jika diperlukan.
-        </p>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="border-b-2 border-gray-200">
-              <tr>
-                <th className="p-3">Nama Pekerja</th>
-                <th className="p-3 hidden md:table-cell">Jabatan</th>
-                <th className="p-3 text-center">Status Kehadiran</th>
-              </tr>
-            </thead>
-            <tbody>
-              {attendanceList.map((pekerja) => (
-                <tr key={pekerja.id} className="border-b border-gray-100">
-                  <td className="p-3 font-medium">{pekerja.nama}</td>
-                  <td className="p-3 text-gray-600 hidden md:table-cell">{pekerja.jabatan}</td>
-                  <td className="p-3 text-center">
-                    <select
-                      value={pekerja.status}
-                      onChange={(e) => handleManualChangeStatus(pekerja.id, e.target.value)}
-                      className={`w-full sm:w-auto px-2 py-1 text-xs font-semibold rounded-full border-none appearance-none text-center ${getStatusBadge(
-                        pekerja.status
-                      )}`}
-                    >
-                      <option value="Belum Hadir">Belum Hadir</option>
-                      <option value="Hadir">Hadir</option>
-                      <option value="Terlambat">Terlambat</option>
-                      <option value="Sakit">Sakit</option>
-                      <option value="Izin">Izin</option>
-                      <option value="Absen">Absen</option>
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Tabel Laporan Mingguan */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Daftar Kehadiran Pekerja</h2>
+          <div className="overflow-x-auto">
+            {loading ? <p>Memuat data...</p> : (
+                <table className="w-full text-left table-auto">
+                  <thead className="border-b-2 border-gray-200 bg-gray-50">
+                  <tr>
+                    <th className="p-3 font-semibold tracking-wide text-sm">Nama Pekerja</th>
+                    <th className="p-3 font-semibold tracking-wide text-sm hidden lg:table-cell">Jabatan</th>
+                    <th className="p-3 font-semibold tracking-wide text-sm text-center">Sen</th>
+                    <th className="p-3 font-semibold tracking-wide text-sm text-center">Sel</th>
+                    <th className="p-3 font-semibold tracking-wide text-sm text-center">Rab</th>
+                    <th className="p-3 font-semibold tracking-wide text-sm text-center">Kam</th>
+                    <th className="p-3 font-semibold tracking-wide text-sm text-center">Jum</th>
+                    <th className="p-3 font-semibold tracking-wide text-sm text-center">Sab</th>
+                    <th className="p-3 font-semibold tracking-wide text-sm text-center">Min</th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  {absensiMingguan.map((pekerja) => (
+                      <tr key={pekerja.id_pekerja} className="border-b border-gray-100">
+                        <td className="p-3 font-medium text-gray-800 whitespace-nowrap">{pekerja.nama_lengkap}</td>
+                        <td className="p-3 text-gray-600 hidden lg:table-cell whitespace-nowrap">{pekerja.nama_pekerjaan}</td>
+                        {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'].map(hari => (
+                            <td key={hari} className="p-3 text-center">
+                                <span className={`w-full px-2 py-1 text-xs font-semibold rounded-full inline-block ${getStatusBadge(pekerja[hari])}`}>
+                                    {pekerja[hari]}
+                                </span>
+                            </td>
+                        ))}
+                      </tr>
+                  ))}
+                  </tbody>
+                </table>
+            )}
+          </div>
         </div>
-      </div>
-    </Layout>
+      </Layout>
   );
 };
 

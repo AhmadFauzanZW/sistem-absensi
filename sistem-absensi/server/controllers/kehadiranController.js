@@ -42,3 +42,46 @@ exports.getCatatanKehadiran = async (req, res) => {
         res.status(500).send('Server Error');
     }
 };
+
+exports.getAbsensiMingguan = async (req, res) => {
+    try {
+        // Ambil tanggal dari query, jika tidak ada, gunakan tanggal hari ini
+        const tanggalPilihan = req.query.tanggal || new Date().toISOString().slice(0, 10);
+
+        // Query ini akan melakukan 'PIVOT' data kehadiran
+        // dari format baris menjadi format kolom per hari untuk satu minggu.
+        const query = `
+            SELECT
+                pk.id_pekerja,
+                p.nama_pengguna AS nama_lengkap,
+                jpk.nama_pekerjaan,
+                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 2 THEN ck.status_kehadiran END), 'N/A') AS Senin,
+                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 3 THEN ck.status_kehadiran END), 'N/A') AS Selasa,
+                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 4 THEN ck.status_kehadiran END), 'N/A') AS Rabu,
+                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 5 THEN ck.status_kehadiran END), 'N/A') AS Kamis,
+                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 6 THEN ck.status_kehadiran END), 'N/A') AS Jumat,
+                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 7 THEN ck.status_kehadiran END), 'N/A') AS Sabtu,
+                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 1 THEN ck.status_kehadiran END), 'N/A') AS Minggu
+            FROM
+                pekerja pk
+            JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+            LEFT JOIN jenis_pekerjaan jpk ON pk.id_jenis_pekerjaan = jpk.id_jenis_pekerjaan
+            LEFT JOIN
+                catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja
+                    AND YEARWEEK(ck.waktu_clock_in, 1) = YEARWEEK(?, 1) -- filter berdasarkan minggu dari tanggal yang dipilih
+            GROUP BY
+                pk.id_pekerja, -- <-- PERBAIKAN DI SINI (p.id_pekerja -> pk.id_pekerja)
+                p.nama_pengguna,
+                jpk.nama_pekerjaan
+            ORDER BY
+                p.nama_pengguna;
+        `;
+
+        const [pekerjaList] = await pool.query(query, [tanggalPilihan]);
+        res.json(pekerjaList);
+
+    } catch (error) {
+        console.error("Gagal mengambil absensi mingguan:", error);
+        res.status(500).send("Server Error");
+    }
+};

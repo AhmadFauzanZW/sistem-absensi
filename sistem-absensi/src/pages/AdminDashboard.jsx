@@ -170,6 +170,19 @@ const AdminDashboard = () => {
                                     <div>
                                         <p><strong>{izin.nama_pengguna}</strong> ({izin.jenis_izin})</p>
                                         <p className="text-sm text-gray-600">Alasan: {izin.keterangan}</p>
+                                        {/* Lampiran (jika ada) */}
+                                        {izin.file_bukti_path && (
+                                            <div className="mt-4">
+                                                <a
+                                                    href={`http://localhost:5000/uploads/${izin.file_bukti_path}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-full md:w-auto text-center bg-gray-200 text-gray-700 px-3 py-2 text-sm rounded hover:bg-gray-300 transition"
+                                                >
+                                                    Lihat Lampiran
+                                                </a>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex gap-2">
                                         <button
@@ -216,7 +229,7 @@ const AdminDashboard = () => {
                                             {new Date(log.waktu_aktivitas).toLocaleString('id-ID')}
                                         </td>
                                         <td className="py-2 pr-4">
-                                            {log.nama_lengkap || log.user} ({log.nama_peran || log.role})
+                                            {log.nama_pengguna || log.user} ({log.nama_peran || log.role})
                                         </td>
                                         <td className="py-2 pr-4">
                         <span className="bg-gray-200 px-2 py-1 rounded-full text-xs">
