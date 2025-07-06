@@ -17,9 +17,12 @@ app.use('/api/kehadiran', require('./routes/kehadiran'));
 app.use('/api/logs', require('./routes/log'));
 app.use('/api/izin', require('./routes/izin'));
 app.use('/api/proyek', require('./routes/proyek'));
+app.use('/api/pekerja', require('./routes/pekerja'));
 // Add other routes here later, e.g.,
 // app.use('/api/workers', require('./routes/workers'));
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server started on port ${PORT}`);
+});
