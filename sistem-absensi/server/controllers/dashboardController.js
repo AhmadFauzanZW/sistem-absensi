@@ -1,87 +1,141 @@
 // server/controllers/dashboardController.js
-
 const pool = require('../config/db');
+const { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } = require('date-fns');
+const { id } = require('date-fns/locale');
 
+// Fungsi helper untuk format tanggal
+const getDisplayPeriod = (filter, date) => {
+    const d = new Date(date);
+    if (filter === 'hari') {
+        return format(d, 'eeee, dd MMMM yyyy', { locale: id });
+    }
+    if (filter === 'minggu') {
+        const awal = format(startOfWeek(d, { weekStartsOn: 1 }), 'dd MMMM');
+        const akhir = format(endOfWeek(d, { weekStartsOn: 1 }), 'dd MMMM yyyy');
+        return `Minggu, ${awal} - ${akhir}`;
+    }
+    if (filter === 'bulan') {
+        return format(d, 'MMMM yyyy', { locale: id });
+    }
+    return '';
+};
+
+
+// Ganti seluruh fungsi getSupervisorSummary
 exports.getSupervisorSummary = async (req, res) => {
     try {
-        // Ambil nilai filter dari query string, defaultnya adalah 'hari'
-        const filter = req.query.filter || 'hari';
+        const { filter = 'hari', date = new Date() } = req.query;
+        const targetDate = new Date(date);
 
         let whereClause = '';
+        let dateRange = '';
 
-        // Tentukan klausa WHERE berdasarkan filter yang dipilih
         switch (filter) {
             case 'minggu':
-                // Mengambil data untuk minggu ini (Senin-Minggu)
-                whereClause = 'WHERE YEARWEEK(waktu_clock_in, 1) = YEARWEEK(CURDATE(), 1)';
+                whereClause = 'WHERE YEARWEEK(ck.waktu_clock_in, 1) = YEARWEEK(?, 1)';
+                dateRange = 'AND YEARWEEK(waktu_clock_in, 1) = YEARWEEK(?, 1)';
                 break;
             case 'bulan':
-                // Mengambil data untuk bulan ini
-                whereClause = 'WHERE MONTH(waktu_clock_in) = MONTH(CURDATE()) AND YEAR(waktu_clock_in) = YEAR(CURDATE())';
+                whereClause = 'WHERE MONTH(ck.waktu_clock_in) = MONTH(?) AND YEAR(ck.waktu_clock_in) = YEAR(?)';
+                dateRange = 'AND MONTH(waktu_clock_in) = MONTH(?) AND YEAR(waktu_clock_in) = YEAR(?)';
                 break;
             case 'hari':
             default:
-                // Mengambil data untuk hari ini
-                whereClause = 'WHERE DATE(waktu_clock_in) = CURDATE()';
+                whereClause = 'WHERE DATE(ck.waktu_clock_in) = DATE(?)';
+                dateRange = 'AND DATE(waktu_clock_in) = DATE(?)';
                 break;
         }
 
-        // Query untuk mengambil ringkasan data kehadiran dengan filter dinamis
-        const query = `
-      SELECT 
-        (SELECT COUNT(*) FROM pekerja) AS total_pekerja,
-        COUNT(CASE WHEN status_kehadiran = 'Hadir' THEN 1 END) AS hadir,
-        COUNT(CASE WHEN status_kehadiran = 'Telat' THEN 1 END) AS terlambat,
-        COUNT(CASE WHEN status_kehadiran = 'Izin' THEN 1 END) AS izin,
-        COUNT(CASE WHEN status_kehadiran = 'Lembur' THEN 1 END) AS lembur,
-        COUNT(CASE WHEN status_kehadiran = 'Pulang Cepat' THEN 1 END) AS pulang_cepat
-      FROM catatan_kehadiran
-      ${whereClause}
-    `;
+        const queryParams = filter === 'bulan' ? [targetDate, targetDate] : [targetDate];
 
-        const [summary] = await pool.query(query);
+        const activeWorkersQuery = `
+            SELECT COUNT(p.id_pekerja) as total_pekerja
+            FROM pekerja p JOIN pengguna u ON p.id_pengguna = u.id_pengguna
+            WHERE u.status_pengguna = 'Aktif'`;
+        const [totalPekerjaResult] = await pool.query(activeWorkersQuery);
+        const total_pekerja = totalPekerjaResult[0].total_pekerja;
 
-        // Hitung absen (total pekerja - yang hadir pada periode filter)
-        const totalHadir = parseInt(summary[0].hadir) + parseInt(summary[0].terlambat) + parseInt(summary[0].izin) + parseInt(summary[0].lembur) + parseInt(summary[0].pulang_cepat);
-        const absen = parseInt(summary[0].total_pekerja) - totalHadir;
+        const summaryQuery = `
+            SELECT
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Hadir' THEN ck.id_pekerja END) AS hadir,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Telat' THEN ck.id_pekerja END) AS terlambat,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Izin' THEN ck.id_pekerja END) AS izin,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Lembur' THEN ck.id_pekerja END) AS lembur,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Pulang Cepat' THEN ck.id_pekerja END) AS pulang_cepat
+            FROM catatan_kehadiran ck ${whereClause}`;
+        const [summaryResult] = await pool.query(summaryQuery, queryParams);
+        const summary = summaryResult[0];
 
-        res.json({ ...summary[0], absen });
+        const attendedWorkersQuery = `SELECT COUNT(DISTINCT id_pekerja) as total_hadir FROM catatan_kehadiran WHERE 1=1 ${dateRange}`;
+        const [attendedResult] = await pool.query(attendedWorkersQuery, queryParams);
+        const totalHadirUnik = attendedResult[0].total_hadir;
+
+        summary.total_pekerja = total_pekerja;
+        summary.absen = total_pekerja - totalHadirUnik;
+
+        let trendData = {};
+        if (filter === 'minggu') {
+            const weeklyTrendQuery = `
+                SELECT DAYNAME(waktu_clock_in) as label, COUNT(DISTINCT id_pekerja) as value
+                FROM catatan_kehadiran WHERE YEARWEEK(waktu_clock_in, 1) = YEARWEEK(?, 1)
+                GROUP BY DAYOFWEEK(waktu_clock_in), label ORDER BY DAYOFWEEK(waktu_clock_in);`;
+            const [rows] = await pool.query(weeklyTrendQuery, queryParams);
+            trendData = { type: 'bar', title: 'Tren Kehadiran Mingguan', labels: rows.map(r => r.label), data: rows.map(r => r.value) };
+        } else if (filter === 'bulan') {
+            const monthlyTrendQuery = `
+                SELECT DATE_FORMAT(waktu_clock_in, '%d %b') as label, COUNT(DISTINCT id_pekerja) as value
+                FROM catatan_kehadiran WHERE MONTH(waktu_clock_in) = MONTH(?) AND YEAR(waktu_clock_in) = YEAR(?)
+                GROUP BY DATE(waktu_clock_in), label ORDER BY DATE(waktu_clock_in);`;
+            const [rows] = await pool.query(monthlyTrendQuery, queryParams);
+            trendData = { type: 'line', title: 'Tren Kehadiran Bulanan', labels: rows.map(r => r.label), data: rows.map(r => r.value) };
+        } else {
+            trendData = {
+                type: 'pie', title: 'Ringkasan Kehadiran Hari Ini',
+                labels: ['Hadir', 'Telat', 'Izin', 'Lembur', 'Pulang Cepat', 'Absen'],
+                data: [ summary.hadir || 0, summary.terlambat || 0, summary.izin || 0, summary.lembur || 0, summary.pulang_cepat || 0, summary.absen ],
+            };
+        }
+
+        res.json({
+            summary,
+            trendData,
+            displayPeriod: getDisplayPeriod(filter, targetDate)
+        });
 
     } catch (error) {
-        console.error(error);
+        console.error("Error fetching summary:", error);
         res.status(500).send('Server Error');
     }
 };
 
+// Ganti seluruh fungsi getRecentActivities
 exports.getRecentActivities = async (req, res) => {
     try {
-        // Ambil parameter untuk filter dan pagination
-        const { filter, page = 1, limit = 10 } = req.query; // Default 10 item per halaman
+        const { filter = 'hari', date = new Date(), page = 1, limit = 8 } = req.query;
+        const targetDate = new Date(date);
         const offset = (page - 1) * limit;
 
         let whereClause = '';
 
-        // Tentukan klausa WHERE berdasarkan filter
         switch (filter) {
             case 'minggu':
-                whereClause = 'WHERE YEARWEEK(ck.waktu_clock_in, 1) = YEARWEEK(CURDATE(), 1)';
+                whereClause = 'WHERE YEARWEEK(ck.waktu_clock_in, 1) = YEARWEEK(?, 1)';
                 break;
             case 'bulan':
-                whereClause = 'WHERE MONTH(ck.waktu_clock_in) = MONTH(CURDATE()) AND YEAR(ck.waktu_clock_in) = YEAR(CURDATE())';
+                whereClause = 'WHERE MONTH(ck.waktu_clock_in) = MONTH(?) AND YEAR(ck.waktu_clock_in) = YEAR(?)';
                 break;
-            case 'hari':
             default:
-                whereClause = 'WHERE DATE(ck.waktu_clock_in) = CURDATE()';
+                whereClause = 'WHERE DATE(ck.waktu_clock_in) = DATE(?)';
                 break;
         }
 
-        // Query untuk mengambil total data untuk pagination
+        const queryParams = filter === 'bulan' ? [targetDate, targetDate] : [targetDate];
+
         const countQuery = `SELECT COUNT(*) as total FROM catatan_kehadiran ck ${whereClause}`;
-        const [totalResult] = await pool.query(countQuery);
+        const [totalResult] = await pool.query(countQuery, queryParams);
         const totalItems = totalResult[0].total;
         const totalPages = Math.ceil(totalItems / limit);
 
-        // Query untuk mengambil daftar aktivitas dengan JOIN ke tabel pengguna dan pagination
         const activityQuery = `
             SELECT
                 p.nama_pengguna,
@@ -90,22 +144,16 @@ exports.getRecentActivities = async (req, res) => {
                 DATE_FORMAT(ck.waktu_clock_out, '%H:%i:%s') as jam_pulang,
                 ck.status_kehadiran
             FROM catatan_kehadiran ck
-            JOIN pengguna p ON ck.id_pengguna = p.id_pengguna
-            ${whereClause}
+                     JOIN pengguna p ON ck.id_pengguna = p.id_pengguna
+                ${whereClause}
             ORDER BY ck.waktu_clock_in DESC
-            LIMIT ?
-            OFFSET ?
-        `;
+                LIMIT ? OFFSET ?`;
 
-        const [activities] = await pool.query(activityQuery, [parseInt(limit), parseInt(offset)]);
+        const [activities] = await pool.query(activityQuery, [...queryParams, parseInt(limit), parseInt(offset)]);
 
         res.json({
             activities,
-            pagination: {
-                currentPage: parseInt(page),
-                totalPages,
-                totalItems
-            }
+            pagination: { currentPage: parseInt(page), totalPages, totalItems }
         });
 
     } catch (error) {
