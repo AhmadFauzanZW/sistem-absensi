@@ -4,9 +4,12 @@ exports.getAllPekerja = async (req, res) => {
     try {
         // Ambil semua pekerja yang memiliki foto profil
         const [pekerja] = await pool.query(`
-            SELECT pk.id_pekerja, p.nama_pengguna, pk.foto_profil_path
+            SELECT 
+                pk.id_pekerja, 
+                p.nama_pengguna, 
+                pk.foto_profil_path
             FROM pekerja pk
-            JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+                JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
             WHERE p.status_pengguna = 'Aktif' AND pk.foto_profil_path IS NOT NULL
         `);
         res.json(pekerja);

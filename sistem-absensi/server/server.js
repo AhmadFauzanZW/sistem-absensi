@@ -5,6 +5,9 @@ require('dotenv').config();
 
 const app = express();
 
+// Scheduler
+require('./services/cronService');
+
 // Middleware
 app.use(cors()); // Enable Cross-Origin Resource Sharing
 app.use(express.json()); // To parse JSON bodies
@@ -18,8 +21,7 @@ app.use('/api/logs', require('./routes/log'));
 app.use('/api/izin', require('./routes/izin'));
 app.use('/api/proyek', require('./routes/proyek'));
 app.use('/api/pekerja', require('./routes/pekerja'));
-// Add other routes here later, e.g.,
-// app.use('/api/workers', require('./routes/workers'));
+// Add other routes here later
 
 const PORT = process.env.PORT || 5000;
 

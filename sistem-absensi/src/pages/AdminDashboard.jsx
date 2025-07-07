@@ -67,6 +67,7 @@ const AdminDashboard = () => {
                 }
 
                 if (user?.role === 'Direktur') {
+                    await fetchIzinData();
                     await fetchLogData();
                 }
             } catch (err) {
@@ -210,6 +211,49 @@ const AdminDashboard = () => {
             {/* --- KONTEN KHUSUS DIREKTUR - LOG AKTIVITAS --- */}
             {user?.role === 'Direktur' && (
                 <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h2 className="font-semibold text-lg mb-4">Izin Membutuhkan Persetujuan Anda</h2>
+                    {izinUntukValidasi.length > 0 ? (
+                        <div className="space-y-3 mb-6">
+                            {izinUntukValidasi.map((izin) => (
+                                <div key={izin.id_pengajuan} className="border p-3 rounded flex justify-between items-center">
+                                    <div>
+                                        <p><strong>{izin.nama_pengguna}</strong> ({izin.jenis_izin})</p>
+                                        <p className="text-sm text-gray-600">Alasan: {izin.keterangan}</p>
+                                        {/* Lampiran (jika ada) */}
+                                        {izin.file_bukti_path && (
+                                            <div className="mt-4">
+                                                <a
+                                                    href={`http://localhost:5000/uploads/${izin.file_bukti_path}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-full md:w-auto text-center bg-gray-200 text-gray-700 px-3 py-2 text-sm rounded hover:bg-gray-300 transition"
+                                                >
+                                                    Lihat Lampiran
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleAction(izin.id_pengajuan, 'tolak')}
+                                            className="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 transition"
+                                        >
+                                            Tolak
+                                        </button>
+                                        <button
+                                            onClick={() => handleAction(izin.id_pengajuan, 'setuju')}
+                                            className="bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200 transition"
+                                        >
+                                            Setujui
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-gray-500 mb-6 italic">Tidak ada pengajuan izin yang menunggu persetujuan.</p>
+                    )}
+                    <hr className="my-6" />
                     <h2 className="font-semibold text-lg mb-4">Log Aktivitas Pengguna</h2>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">

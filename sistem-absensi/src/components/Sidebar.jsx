@@ -21,7 +21,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     // { path: '/pekerja/izin', label: 'Pengajuan Izin' },
   ];
 
-  const adminMenu = [
+  const managerMenu = [
     { path: '/admin/dashboard', label: 'Dashboard Utama' },
     { path: '/pengajuan-izin', label: 'Pengajuan Izin', roles: ['Pekerja', 'Supervisor', 'Manager'] },
     { path: '/riwayat-izin', label: 'Riwayat Izin', roles: ['Pekerja', 'Supervisor', 'Manager', 'Direktur'] },
@@ -29,10 +29,16 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     // { path: '/admin/kelola-pekerja', label: 'Kelola Pekerja' },
   ];
 
+  const direkturMenu = [
+    { path: '/admin/dashboard', label: 'Dashboard Utama' },
+    { path: '/riwayat-izin', label: 'Riwayat Izin', roles: ['Pekerja', 'Supervisor', 'Manager', 'Direktur'] },
+  ];
+
   let menuItems = [];
   if (user?.role === 'Supervisor') menuItems = supervisorMenu;
   if (user?.role === 'Pekerja') menuItems = pekerjaMenu;
-  if (['Manager', 'Direktur'].includes(user?.role)) menuItems = adminMenu;
+  if (user?.role === 'Manager') menuItems = managerMenu;
+  if (user?.role === 'Direktur') menuItems = direkturMenu;
 
   return (
     <div

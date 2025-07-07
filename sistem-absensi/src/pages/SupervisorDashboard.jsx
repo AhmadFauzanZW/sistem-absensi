@@ -18,22 +18,29 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointEleme
 // Komponen Grafik Dinamis (dari jawaban sebelumnya, sedikit disesuaikan)
 const DynamicChart = ({ chartData }) => {
     if (!chartData || !chartData.type) return <div className="h-full flex justify-center items-center text-gray-400">Pilih filter untuk melihat grafik...</div>;
-    const options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } };
+
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'top' },
+            tooltip: { mode: 'index', intersect: false },
+        },
+        scales: (chartData.type === 'bar' || chartData.type === 'line') ? {
+            x: { stacked: chartData.type === 'bar' }, // Tumpuk batang untuk perbandingan
+            y: { stacked: chartData.type === 'bar', beginAtZero: true }
+        } : undefined,
+    };
+
     const data = {
         labels: chartData.labels,
-        datasets: [{
-            label: 'Jumlah Kehadiran',
-            data: chartData.data,
-            backgroundColor: chartData.type === 'pie' ? ['rgba(75, 192, 102, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)', 'rgba(255, 99, 132, 0.7)'] : 'rgba(54, 162, 235, 0.6)',
-            borderColor: chartData.type === 'pie' ? ['#fff'] : 'rgba(54, 162, 235, 1)',
-            borderWidth: chartData.type === 'pie' ? 2 : 1,
-            fill: chartData.type === 'line' ? false : undefined,
-            tension: chartData.type === 'line' ? 0.2 : undefined,
-        }],
+        // Langsung gunakan datasets dari backend
+        datasets: chartData.datasets,
     };
+
     if (chartData.type === 'bar') return <Bar options={options} data={data} />;
     if (chartData.type === 'line') return <Line options={options} data={data} />;
-    if (chartData.type === 'pie') return <Pie options={options} data={data} />;
+    if (chartData.type === 'pie') return <Pie options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }} data={data} />;
     return null;
 };
 
@@ -117,15 +124,15 @@ const SupervisorDashboard = () => {
                         locale={indonesianLocale}
                         className="w-48 p-2 border rounded-lg text-center"
                     />
-                    <button onClick={() => handleFilterChange('hari')} className={`px-4 py-2 text-sm font-medium rounded ${filter === 'hari' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Harian</button>
-                    <button onClick={() => handleFilterChange('minggu')} className={`px-4 py-2 text-sm font-medium rounded ${filter === 'minggu' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Mingguan</button>
-                    <button onClick={() => handleFilterChange('bulan')} className={`px-4 py-2 text-sm font-medium rounded ${filter === 'bulan' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Bulanan</button>
+                    <button onClick={() => handleFilterChange('hari')} className={`px-4 py-2 text-sm font-medium rounded cursor-pointer ${filter === 'hari' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Harian</button>
+                    <button onClick={() => handleFilterChange('minggu')} className={`px-4 py-2 text-sm font-medium rounded cursor-pointer ${filter === 'minggu' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Mingguan</button>
+                    <button onClick={() => handleFilterChange('bulan')} className={`px-4 py-2 text-sm font-medium rounded cursor-pointer ${filter === 'bulan' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Bulanan</button>
                 </div>
                 <Link to="/supervisor/absensi" className="bg-green-600 text-white px-6 py-3 rounded font-bold hover:bg-green-700 shadow-lg">Mulai Sesi Absensi</Link>
             </div>
 
             {/* Kartu Statistik dengan Flex Wrap */}
-            <div className="flex flex-wrap gap-4 mb-6">
+            <div className="flex flex-wrap gap-4 mb-6 ">
                 <StatCard title="Total Aktif" value={summary.total_pekerja || 0} icon="👥" />
                 <StatCard title="Hadir" value={summary.hadir || 0} icon="✅" />
                 <StatCard title="Terlambat" value={summary.terlambat || 0} icon="⚠️" />
@@ -156,43 +163,43 @@ const SupervisorDashboard = () => {
                                 <table className="w-full text-left">
                                     {/* ... thead dan tbody sama seperti sebelumnya ... */}
                                     <thead className="border-b-2 border-gray-200">
-                                    <tr>
-                                        <th className="py-2 px-3">Nama Pekerja</th>
-                                        <th className="py-2 px-3">Tanggal</th>
-                                        <th className="py-2 px-3">Jam Masuk</th>
-                                        <th className="py-2 px-3">Jam Pulang</th>
-                                        <th className="py-2 px-3">Status</th>
-                                    </tr>
+                                        <tr>
+                                            <th className="py-2 px-3">Nama Pekerja</th>
+                                            <th className="py-2 px-3">Tanggal</th>
+                                            <th className="py-2 px-3">Jam Masuk</th>
+                                            <th className="py-2 px-3">Jam Pulang</th>
+                                            <th className="py-2 px-3">Total Jam Kerja</th>
+                                            <th className="py-2 px-3">Status</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
-                                    {activities.length > 0 ? (
-                                        activities.map((activity, index) => (
-                                            <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                                                <td className="py-3 px-3 font-medium">{activity.nama_pengguna}</td>
-                                                <td className="py-3 px-3 text-gray-600">{activity.tanggal}</td>
-                                                <td className="py-3 px-3 text-gray-600">{activity.jam_masuk || '-'}</td>
-                                                <td className="py-3 px-3 text-gray-600">{activity.jam_pulang || '-'}</td>
-                                                <td className="py-3 px-3">
-                                                  <span
-                                                      className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                                          activity.status_kehadiran === 'Hadir' ? 'bg-green-100 text-green-800' :
+                                        {activities.length > 0 ? (
+                                            activities.map((activity, index) => (
+                                                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                                                    <td className="py-3 px-3 font-medium">{activity.nama_pengguna}</td>
+                                                    <td className="py-3 px-3 text-gray-600">{activity.tanggal}</td>
+                                                    <td className="py-3 px-3 text-gray-600">{activity.jam_masuk || '-'}</td>
+                                                    <td className="py-3 px-3 text-gray-600">{activity.jam_pulang || '-'}</td>
+                                                    <td className="py-3 px-3 font-semibold">{activity.total_jam_kerja || '-'}</td>
+                                                    <td className="py-3 px-3">
+                                                      <span
+                                                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                                              activity.status_kehadiran === 'Hadir' ? 'bg-green-100 text-green-800' :
                                                               activity.status_kehadiran === 'Telat' ? 'bg-yellow-100 text-yellow-800' :
-                                                                  activity.status_kehadiran === 'Izin' ? 'bg-cyan-100 text-cyan-800' :
-                                                                      activity.status_kehadiran === 'Lembur' ? 'bg-indigo-100 text-indigo-800' :
-                                                                          activity.status_kehadiran === 'Pulang Cepat' ? 'bg-orange-100 text-orange-800' :
-                                                                              'bg-gray-100 text-gray-800'
-                                                      }`}
-                                                  >
-                                                      {activity.status_kehadiran}
-                                                    </span>
-                                                </td>
+                                                              activity.status_kehadiran === 'Izin' ? 'bg-cyan-100 text-cyan-800' :
+                                                              activity.status_kehadiran === 'Lembur' ? 'bg-indigo-100 text-indigo-800' :
+                                                              activity.status_kehadiran === 'Pulang Cepat' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}
+                                                      >
+                                                          {activity.status_kehadiran}
+                                                      </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="5" className="text-center py-6 text-gray-500">Tidak ada data kehadiran untuk periode ini.</td>
                                             </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="5" className="text-center py-6 text-gray-500">Tidak ada data kehadiran untuk periode ini.</td>
-                                        </tr>
-                                    )}
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

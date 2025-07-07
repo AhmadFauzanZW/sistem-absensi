@@ -89,7 +89,7 @@ const PengajuanIzin = () => {
                             name="jenis_izin"
                             value={formData.jenis_izin}
                             onChange={handleChange}
-                            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            className="mt-1 p-2 cursor-pointer block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option>Sakit</option>
                             <option>Cuti</option>
@@ -107,7 +107,7 @@ const PengajuanIzin = () => {
                                 value={formData.tanggal_mulai}
                                 onChange={handleChange}
                                 required
-                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                className="mt-1 p-2 cursor-pointer block w-full border-gray-300 rounded-md shadow-sm"
                             />
                             <input
                                 type="date"
@@ -115,7 +115,7 @@ const PengajuanIzin = () => {
                                 value={formData.tanggal_selesai}
                                 onChange={handleChange}
                                 required
-                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                className="mt-1 p-2 cursor-pointer block w-full border-gray-300 rounded-md shadow-sm"
                             />
                         </div>
                     </div>
@@ -129,18 +129,18 @@ const PengajuanIzin = () => {
                             onChange={handleChange}
                             rows="4"
                             required
-                            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            className="mt-1 p-2 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         ></textarea>
                     </div>
 
                     {/* Lampiran Bukti */}
-                    <div>
+                    <div className={'cursor-pointer'}>
                         <label className="block text-sm font-medium mb-1">Lampiran Bukti (Opsional)</label>
                         <input
                             type="file"
                             name="bukti"
                             onChange={handleFileChange}
-                            className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            className="mt-1 cursor-pointer block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                         />
                     </div>
 
@@ -151,7 +151,7 @@ const PengajuanIzin = () => {
                     {/* Tombol Submit */}
                     <button
                         type="submit"
-                        className="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded hover:bg-blue-700 transition duration-200"
+                        className="w-full cursor-pointer bg-blue-600 text-white font-semibold py-2 px-4 rounded hover:bg-blue-700 transition duration-200"
                     >
                         Kirim Pengajuan
                     </button>

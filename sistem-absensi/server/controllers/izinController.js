@@ -90,8 +90,8 @@ exports.getRiwayatIzin = async (req, res) => {
             query = `
                 SELECT pi.*, GROUP_CONCAT(CONCAT(lp.status_persetujuan, ' oleh ', p.nama_pengguna) SEPARATOR '; ') as approval_logs
                 FROM pengajuan_izin pi
-                LEFT JOIN log_persetujuan_izin lp ON pi.id_pengajuan = lp.id_pengajuan
-                LEFT JOIN pengguna p ON lp.id_penyetuju = p.id_pengguna
+                    LEFT JOIN log_persetujuan_izin lp ON pi.id_pengajuan = lp.id_pengajuan
+                    LEFT JOIN pengguna p ON lp.id_penyetuju = p.id_pengguna
                 WHERE pi.id_pekerja = ?
                 GROUP BY pi.id_pengajuan
                 ORDER BY pi.tanggal_pengajuan DESC
