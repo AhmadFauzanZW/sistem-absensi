@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import axiosInstance from '../api/axiosInstance';
 import Layout from '../components/Layout';
 
 const PengajuanIzin = () => {
@@ -56,7 +56,7 @@ const PengajuanIzin = () => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/izin', data, {
+            await axiosInstance.post('/izin', data, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'

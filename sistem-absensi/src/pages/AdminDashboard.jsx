@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import axiosInstance from '../api/axiosInstance';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -16,7 +16,7 @@ const AdminDashboard = () => {
     const fetchIzinData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:5000/api/izin/validasi', {
+            const response = await axiosInstance.get('/izin/validasi', {
                 headers: { Authorization: `Bearer ${token}` },
                 params: { lokasi: lokasiTerpilih }
             });
@@ -30,7 +30,7 @@ const AdminDashboard = () => {
     const fetchLogData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:5000/api/logs', {
+            const response = await axiosInstance.get('/logs', {
                 headers: { Authorization: `Bearer ${token}` },
                 params: { lokasi: lokasiTerpilih }
             });
@@ -44,7 +44,7 @@ const AdminDashboard = () => {
     const fetchLokasiList = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:5000/api/proyek/lokasi', {
+            const response = await axiosInstance.get('/proyek/lokasi', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setLokasiList(response.data);
@@ -99,7 +99,7 @@ const AdminDashboard = () => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.put(`http://localhost:5000/api/izin/${id_pengajuan}/proses`,
+            await axiosInstance.put(`/izin/${id_pengajuan}/proses`,
                 { aksi, catatan }, // <-- KIRIM 'catatan' DI SINI
                 { headers: { Authorization: `Bearer ${token}` } }
             );

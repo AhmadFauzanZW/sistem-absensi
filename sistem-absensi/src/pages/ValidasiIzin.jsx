@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosInstance from '../api/axiosInstance';
 import Layout from '../components/Layout';
 
 const ValidasiIzin = () => {
@@ -19,7 +19,7 @@ const ValidasiIzin = () => {
   const fetchIzinUntukValidasi = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/izin/validasi', {
+      const response = await axiosInstance.get('/izin/validasi', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setIzinList(response.data);
@@ -53,8 +53,8 @@ const ValidasiIzin = () => {
     try {
       setLoading(true); // Opsional: tampilkan loading saat proses
       const token = localStorage.getItem('token');
-      await axios.put(
-          `http://localhost:5000/api/izin/${id_pengajuan}/proses`,
+      await axiosInstance.put(
+          `/izin/${id_pengajuan}/proses`,
           { aksi, catatan }, // <-- KIRIM 'catatan' DI SINI
           { headers: { Authorization: `Bearer ${token}` } }
       );

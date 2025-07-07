@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import axiosInstance from '../api/axiosInstance';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -17,7 +17,7 @@ const LoginPage = () => {
 
     try {
       // Kirim permintaan login ke backend
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axiosInstance.post('/auth/login', {
         email,
         password,
       });

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import axiosInstance from '../api/axiosInstance';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
 import Calendar from 'react-calendar';
@@ -64,7 +64,7 @@ const PekerjaProfile = () => {
         params = { month: format(calendarDate, 'yyyy-MM') };
       }
 
-      const res = await axios.get('http://localhost:5000/api/pekerja/history', {
+      const res = await axiosInstance.get('/pekerja/history', {
         headers: { Authorization: `Bearer ${token}` },
         params
       });
@@ -88,7 +88,7 @@ const PekerjaProfile = () => {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/pekerja/profil', {
+        const res = await axiosInstance.get('/pekerja/profil', {
           headers: { Authorization: `Bearer ${token}` },
           params: { filter }
         });

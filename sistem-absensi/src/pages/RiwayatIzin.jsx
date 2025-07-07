@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosInstance from '../api/axiosInstance';
 import Layout from '../components/Layout';
 import StatusPersetujuan from '../components/StatusPersetujuan';
 
@@ -11,7 +11,7 @@ const RiwayatIzin = () => {
         const fetchHistory = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await axios.get('http://localhost:5000/api/izin/riwayat', {
+                const response = await axiosInstance.get('/izin/riwayat', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setHistoryList(response.data);

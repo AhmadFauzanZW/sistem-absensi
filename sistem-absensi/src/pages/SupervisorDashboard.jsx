@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import axiosInstance from '../api/axiosInstance';
 import Layout from '../components/Layout';
 import StatCard from '../components/StatCard';
 
@@ -70,8 +70,8 @@ const SupervisorDashboard = () => {
                     page: pagination.currentPage,
                 };
 
-                const summaryPromise = axios.get('http://localhost:5000/api/dashboard/summary', { headers, params: { filter: params.filter, date: params.date } });
-                const activitiesPromise = axios.get('http://localhost:5000/api/dashboard/activities', { headers, params });
+                const summaryPromise = axiosInstance.get('/dashboard/summary', { headers, params: { filter: params.filter, date: params.date } });
+                const activitiesPromise = axiosInstance.get('/dashboard/activities', { headers, params });
 
                 const [summaryRes, activitiesRes] = await Promise.all([summaryPromise, activitiesPromise]);
 

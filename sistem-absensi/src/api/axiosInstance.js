@@ -3,7 +3,7 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-    baseURL: 'http://localhost:5000/api', // Base URL untuk semua API kita
+    baseURL: 'http://192.168.0.104:5000/api', // Base URL untuk semua API kita
 });
 
 // Interceptor untuk setiap PERMINTAAN (REQUEST)
