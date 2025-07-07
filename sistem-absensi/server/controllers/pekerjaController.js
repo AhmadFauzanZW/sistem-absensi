@@ -93,8 +93,19 @@ exports.getProfileData = async (req, res) => {
 
         // Kalkulasi lembur (tetap sama)
         const overtimeQuery = `
-             SELECT SEC_TO_TIME(SUM(CASE WHEN status_kehadiran = 'Lembur' THEN TIME_TO_SEC(TIMEDIFF(waktu_clock_out, '16:00:00')) ELSE 0 END)) as total_jam_lembur
-             FROM catatan_kehadiran ${whereClause}`;
+            SELECT
+                SEC_TO_TIME(
+                        SUM(
+                                CASE
+                                    -- Hanya hitung sebagai lembur jika status = 'Lembur' dan durasi kerja > 9 jam
+                                    WHEN status_kehadiran = 'Lembur' AND TIME_TO_SEC(TIMEDIFF(waktu_clock_out, waktu_clock_in)) > (9 * 3600)
+                                        THEN TIME_TO_SEC(TIMEDIFF(waktu_clock_out, waktu_clock_in)) - (9 * 3600)
+                                    ELSE 0
+                                    END
+                        )
+                ) AS total_jam_lembur
+            FROM catatan_kehadiran ${whereClause}`;
+
         const [overtimeResult] = await pool.query(overtimeQuery, [id_pekerja]);
         const total_jam_lembur = overtimeResult[0].total_jam_lembur;
         const tarifLemburPerJam = (gaji_harian / 8) * 1.5;

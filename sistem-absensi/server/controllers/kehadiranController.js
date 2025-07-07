@@ -104,8 +104,8 @@ exports.catatKehadiran = async (req, res) => {
             const jamSekarang = sekarang.getHours();
 
             // Batasi clock-in hanya bisa dilakukan antara jam 5 pagi hingga 4 sore.
-            if (jamSekarang < 5 || jamSekarang >= 16) {
-                return res.status(400).json({ message: 'Tidak bisa melakukan clock-in di luar jam kerja (05:00 - 16:00).' });
+            if (jamSekarang < 7 || jamSekarang >= 16) {
+                return res.status(400).json({ message: 'Tidak bisa melakukan clock-in di luar jam kerja (07:00 - 16:00).' });
             }
 
             // Cek apakah sudah ada clock_in untuk hari ini
@@ -131,7 +131,7 @@ exports.catatKehadiran = async (req, res) => {
             }
 
             const batasWaktu = new Date();
-            batasWaktu.setHours(8, 0, 0, 0);
+            batasWaktu.setHours(8, 5, 0, 0);
             const status_kehadiran = sekarang > batasWaktu ? 'Telat' : 'Hadir';
 
             const query = `
@@ -141,29 +141,36 @@ exports.catatKehadiran = async (req, res) => {
             res.status(201).json({ message: 'Clock-In berhasil dicatat!' });
 
         } else if (tipe_aksi === 'clock_out') {
-            const jamPulang = new Date();
-            const batasWaktuNormal = new Date();
-            batasWaktuNormal.setHours(16, 0, 0, 0);
-
-            // Cek status clock-in sebelumnya untuk menentukan status clock-out
             const [clockInRecord] = await pool.query(
-                `SELECT status_kehadiran FROM catatan_kehadiran 
-                 WHERE id_pekerja = ? AND DATE(waktu_clock_in) = CURDATE() AND waktu_clock_out IS NULL 
-                 ORDER BY waktu_clock_in DESC LIMIT 1`, [id_pekerja]
+                `SELECT waktu_clock_in, status_kehadiran FROM catatan_kehadiran 
+         WHERE id_pekerja = ? AND DATE(waktu_clock_in) = CURDATE() AND waktu_clock_out IS NULL 
+         ORDER BY waktu_clock_in DESC LIMIT 1`, [id_pekerja]
             );
 
             if (clockInRecord.length === 0) {
                 return res.status(404).json({ message: 'Tidak ditemukan data Clock-In untuk di-Clock-Out.' });
             }
 
-            let status_pulang = clockInRecord[0].status_kehadiran; // Default status sama dengan saat masuk
-            if (jamPulang > batasWaktuNormal) status_pulang = 'Lembur';
-            if (jamPulang < batasWaktuNormal) status_pulang = 'Pulang Cepat';
+            const waktuMasuk = new Date(clockInRecord[0].waktu_clock_in);
+            const waktuPulang = new Date();
+
+            // Hitung total durasi kerja dalam menit
+            const durasiMenit = (waktuPulang - waktuMasuk) / (1000 * 60);
+            const standarDurasiKerjaNormal = 8 * 60; // 8 jam kerja
+            const standarDurasiKerjaPenuh = 9 * 60;  // 9 jam (termasuk 1 jam istirahat)
+
+            let status_pulang = clockInRecord[0].status_kehadiran; // Status default = status saat masuk
+            if (durasiMenit > standarDurasiKerjaPenuh) {
+                status_pulang = 'Lembur';
+            } else if (durasiMenit < standarDurasiKerjaNormal) {
+                status_pulang = 'Pulang Cepat';
+            }
 
             const updateQuery = `
                 UPDATE catatan_kehadiran SET waktu_clock_out = NOW(), status_kehadiran = ?
                 WHERE id_pekerja = ? AND DATE(waktu_clock_in) = CURDATE() AND waktu_clock_out IS NULL
                 ORDER BY waktu_clock_in DESC LIMIT 1`;
+
             await pool.query(updateQuery, [status_pulang, id_pekerja]);
             res.status(200).json({ message: 'Clock-Out berhasil dicatat!' });
         }
