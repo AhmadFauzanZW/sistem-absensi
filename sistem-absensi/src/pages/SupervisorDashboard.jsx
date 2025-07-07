@@ -188,7 +188,8 @@ const SupervisorDashboard = () => {
                                                               activity.status_kehadiran === 'Telat' ? 'bg-yellow-100 text-yellow-800' :
                                                               activity.status_kehadiran === 'Izin' ? 'bg-cyan-100 text-cyan-800' :
                                                               activity.status_kehadiran === 'Lembur' ? 'bg-indigo-100 text-indigo-800' :
-                                                              activity.status_kehadiran === 'Pulang Cepat' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}
+                                                              activity.status_kehadiran === 'Pulang Cepat' ? 'bg-orange-100 text-orange-800' :
+                                                              activity.status_kehadiran === 'Absen' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}
                                                       >
                                                           {activity.status_kehadiran}
                                                       </span>

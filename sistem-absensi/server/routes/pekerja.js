@@ -1,12 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { getAllPekerja, getPekerjaById } = require('../controllers/pekerjaController'); // Tambahkan getPekerjaById
+
+const { getProfileData, getAllPekerja, getPekerjaById, getAttendanceHistory } = require('../controllers/pekerjaController');
 const { protect } = require('../middleware/authMiddleware');
 
-// GET /api/pekerja/all
+// Endpoint untuk Halaman Absensi
 router.get('/all', protect, getAllPekerja);
 
-// GET /api/pekerja/by-id/:id_pekerja  <-- ROUTE BARU
-router.get('/by-id/:id_pekerja', protect, getPekerjaById);
+// Rute yang lebih SPESIFIK harus didefinisikan PERTAMA
+router.get('/profil', protect, getProfileData);
+router.get('/history', protect, getAttendanceHistory);
+
+// Rute yang lebih UMUM (dinamis) didefinisikan SETELAHNYA
+router.get('/:id_pekerja', protect, getPekerjaById);
 
 module.exports = router;
