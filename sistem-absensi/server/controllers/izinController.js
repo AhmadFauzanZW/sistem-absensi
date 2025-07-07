@@ -161,6 +161,7 @@ exports.prosesValidasi = async (req, res) => {
             const endDate = new Date(izin.tanggal_selesai);
 
             while (currentDate <= endDate) {
+                currentDate.setDate(currentDate.getDate() + 1);
                 const dateString = currentDate.toISOString().slice(0, 10);
 
                 // Masukkan ke catatan kehadiran sebagai 'Izin'
@@ -170,7 +171,6 @@ exports.prosesValidasi = async (req, res) => {
                      ON DUPLICATE KEY UPDATE status_kehadiran = 'Izin'`, // Mencegah error jika sudah ada data di hari itu
                     [izin.id_pekerja, `${dateString} 08:00:00`]
                 );
-                currentDate.setDate(currentDate.getDate() + 1);
             }
             await logActivity(id_penyetuju, 'SISTEM', `Membuat catatan absensi 'Izin' untuk izin #${id_pengajuan}`, req);
         }
