@@ -15,63 +15,73 @@ const getDisplayPeriod = (filter, date) => {
     return '';
 };
 
-// GANTI SELURUH FUNGSI INI
 exports.getSupervisorSummary = async (req, res) => {
     try {
-        const { filter = 'hari', date = new Date() } = req.query;
+        // Menambahkan 'lokasi' sebagai parameter query, default ke null jika tidak ada
+        const { filter = 'hari', date = new Date(), lokasi = null } = req.query;
         const targetDate = new Date(date);
-        let whereClause = '';
-        let queryParams = [];
 
+        // Menyiapkan klausa WHERE untuk filter tanggal
+        let whereClause = '';
+        let dateParams = [];
         switch (filter) {
             case 'minggu':
                 whereClause = 'WHERE YEARWEEK(waktu_clock_in, 1) = YEARWEEK(?, 1)';
-                queryParams = [targetDate];
+                dateParams = [targetDate];
                 break;
             case 'bulan':
                 whereClause = 'WHERE MONTH(waktu_clock_in) = MONTH(?) AND YEAR(waktu_clock_in) = YEAR(?)';
-                queryParams = [targetDate, targetDate];
+                dateParams = [targetDate, targetDate];
                 break;
-            default:
+            default: // hari
                 whereClause = 'WHERE DATE(waktu_clock_in) = DATE(?)';
-                queryParams = [targetDate];
+                dateParams = [targetDate];
                 break;
         }
 
-        // 1. Ambil Total Pekerja Aktif (Tetap sama, sudah benar)
-        const activeWorkersQuery = `SELECT COUNT(p.id_pekerja) as total_pekerja 
-                                            FROM pekerja p 
-                                                JOIN pengguna u ON p.id_pengguna = u.id_pengguna 
-                                            WHERE u.status_pengguna = 'Aktif'`;
-        const [totalPekerjaResult] = await pool.query(activeWorkersQuery);
+        // Menyiapkan parameter lokasi untuk semua query
+        const lokasiParams = [lokasi, lokasi];
+
+        // 1. Ambil Total Pekerja Aktif, difilter berdasarkan lokasi
+        const activeWorkersQuery = `
+            SELECT COUNT(p.id_pekerja) as total_pekerja 
+            FROM pekerja p 
+            JOIN pengguna u ON p.id_pengguna = u.id_pengguna 
+            WHERE u.status_pengguna = 'Aktif'
+              AND (p.id_lokasi_penugasan = ? OR ? IS NULL)`;
+        const [totalPekerjaResult] = await pool.query(activeWorkersQuery, lokasiParams);
         const total_pekerja = totalPekerjaResult[0].total_pekerja;
 
-        // 2. Ambil Summary untuk Kartu Statistik (Sudah benar)
+        // 2. Ambil Summary untuk Kartu Statistik, difilter berdasarkan tanggal dan lokasi
         const summaryQuery = `
             SELECT
-                COUNT(DISTINCT CASE WHEN status_kehadiran = 'Hadir' THEN id_pekerja END) AS hadir,
-                COUNT(DISTINCT CASE WHEN status_kehadiran = 'Telat' THEN id_pekerja END) AS terlambat,
-                COUNT(DISTINCT CASE WHEN status_kehadiran = 'Izin' THEN id_pekerja END) AS izin,
-                COUNT(DISTINCT CASE WHEN status_kehadiran = 'Lembur' THEN id_pekerja END) AS lembur,
-                COUNT(DISTINCT CASE WHEN status_kehadiran = 'Pulang Cepat' THEN id_pekerja END) AS pulang_cepat,
-                COUNT(DISTINCT CASE WHEN status_kehadiran = 'Absen' THEN id_pekerja END) AS absen
-            FROM catatan_kehadiran ck ${whereClause}`;
-        const [summaryResult] = await pool.query(summaryQuery, queryParams);
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Hadir' THEN ck.id_pekerja END) AS hadir,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Telat' THEN ck.id_pekerja END) AS terlambat,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Izin' THEN ck.id_pekerja END) AS izin,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Lembur' THEN ck.id_pekerja END) AS lembur,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Pulang Cepat' THEN ck.id_pekerja END) AS pulang_cepat,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran = 'Absen' THEN ck.id_pekerja END) AS absen
+            FROM catatan_kehadiran ck
+            JOIN pekerja p ON ck.id_pekerja = p.id_pekerja
+            ${whereClause}
+            AND (p.id_lokasi_penugasan = ? OR ? IS NULL)`;
+        const [summaryResult] = await pool.query(summaryQuery, [...dateParams, ...lokasiParams]);
         const summary = summaryResult[0];
         summary.total_pekerja = total_pekerja;
 
-        // PERBAIKAN 1: LOGIKA PERHITUNGAN ABSEN
-        // Absen = Total Pekerja - (Pekerja yang Hadir/Telat/Lembur/Pulang Cepat). 'Izin' tidak dihitung.
+        // 3. Logika perhitungan 'Belum Hadir'
+        // Mengambil jumlah pekerja yang sudah tercatat kehadirannya (status apapun) pada periode dan lokasi terpilih
         const physicallyPresentQuery = `
-            SELECT COUNT(DISTINCT id_pekerja) as total_present
-            FROM catatan_kehadiran
-            WHERE status_kehadiran IN ('Hadir', 'Telat', 'Lembur', 'Pulang Cepat', 'Izin', 'Absen')
-                ${whereClause.replace('WHERE', 'AND')}`; // Ganti WHERE jadi AND
-        const [presentResult] = await pool.query(physicallyPresentQuery, queryParams);
+            SELECT COUNT(DISTINCT ck.id_pekerja) as total_present
+            FROM catatan_kehadiran ck
+                     JOIN pekerja p ON ck.id_pekerja = p.id_pekerja
+                ${whereClause}
+            AND (p.id_lokasi_penugasan = ? OR ? IS NULL)`;
+        const [presentResult] = await pool.query(physicallyPresentQuery, [...dateParams, ...lokasiParams]);
         const totalHadirFisik = presentResult[0].total_present;
         summary.belum_hadir = total_pekerja - totalHadirFisik;
 
-        // PERBAIKAN 2: DATA GRAFIK YANG LEBIH LENGKAP
+        // 4. Data Grafik yang lebih lengkap, difilter berdasarkan tanggal dan lokasi
         let trendData = {};
         const statusList = ['Hadir', 'Telat', 'Izin', 'Lembur', 'Pulang Cepat', 'Absen'];
         const statusColors = {
@@ -81,7 +91,7 @@ exports.getSupervisorSummary = async (req, res) => {
             Lembur: 'rgba(153, 102, 255, 0.7)',
             'Pulang Cepat': 'rgba(255, 159, 64, 0.7)',
             Absen: 'rgba(255, 99, 132, 0.7)',
-            'Belum Hadir': 'rgba(201, 203, 207, 0.7)' // Warna untuk 'Belum Hadir'
+            'Belum Hadir': 'rgba(201, 203, 207, 0.7)'
         };
 
         if (filter === 'minggu') {
@@ -91,12 +101,14 @@ exports.getSupervisorSummary = async (req, res) => {
 
             for (const status of statusList) {
                 const query = `
-                    SELECT DAYNAME(waktu_clock_in) as day, COUNT(DISTINCT id_pekerja) as count
-                    FROM catatan_kehadiran
-                    WHERE status_kehadiran = ? AND YEARWEEK(waktu_clock_in, 1) = YEARWEEK(?, 1)
+                    SELECT DAYNAME(waktu_clock_in) as day, COUNT(DISTINCT ck.id_pekerja) as count
+                    FROM catatan_kehadiran ck
+                    JOIN pekerja p ON ck.id_pekerja = p.id_pekerja
+                    WHERE ck.status_kehadiran = ? AND YEARWEEK(waktu_clock_in, 1) = YEARWEEK(?, 1)
+                      AND (p.id_lokasi_penugasan = ? OR ? IS NULL)
                     GROUP BY day;
                 `;
-                const [rows] = await pool.query(query, [status, targetDate]);
+                const [rows] = await pool.query(query, [status, targetDate, ...lokasiParams]);
                 const dataMap = new Map(rows.map(r => [r.day, r.count]));
                 datasets.push({
                     label: status,
@@ -110,16 +122,18 @@ exports.getSupervisorSummary = async (req, res) => {
             const query = `
                 SELECT
                     DATE_FORMAT(waktu_clock_in, '%Y-%m-%d') as full_date,
-                    status_kehadiran,
-                    COUNT(DISTINCT id_pekerja) as count
-                FROM catatan_kehadiran
+                    ck.status_kehadiran,
+                    COUNT(DISTINCT ck.id_pekerja) as count
+                FROM catatan_kehadiran ck
+                JOIN pekerja p ON ck.id_pekerja = p.id_pekerja
                 WHERE MONTH(waktu_clock_in) = MONTH(?) AND YEAR(waktu_clock_in) = YEAR(?)
-                GROUP BY full_date, status_kehadiran
+                  AND (p.id_lokasi_penugasan = ? OR ? IS NULL)
+                GROUP BY full_date, ck.status_kehadiran
                 ORDER BY full_date;
             `;
-            const [rows] = await pool.query(query, queryParams);
+            const [rows] = await pool.query(query, [...dateParams, ...lokasiParams]);
 
-            const dateLabels = [...new Set(rows.map(r => format(new Date(r.full_date), 'dd MMM')))].sort();
+            const dateLabels = [...new Set(rows.map(r => format(new Date(r.full_date), 'dd MMM')))].sort((a, b) => new Date(a) - new Date(b));
             const datasets = [];
 
             for (const status of statusList) {
@@ -143,7 +157,6 @@ exports.getSupervisorSummary = async (req, res) => {
                 datasets: [{
                     label: 'Jumlah',
                     data: [ summary.hadir || 0, summary.terlambat || 0, summary.izin || 0, summary.lembur || 0, summary.pulang_cepat || 0, summary.absen || 0, summary.belum_hadir ],
-                    // Tambahkan array warna yang hilang
                     backgroundColor: [
                         statusColors.Hadir, statusColors.Telat, statusColors.Izin,
                         statusColors.Lembur, statusColors['Pulang Cepat'], statusColors.Absen, statusColors['Belum Hadir']
@@ -157,35 +170,52 @@ exports.getSupervisorSummary = async (req, res) => {
         res.json({ summary, trendData, displayPeriod: getDisplayPeriod(filter, targetDate) });
 
     } catch (error) {
-        console.error("Error fetching summary:", error);
+        console.error("Error fetching supervisor summary:", error);
         res.status(500).send('Server Error');
     }
 };
 
-// Fungsi getRecentActivities tidak perlu diubah
-// ... (salin fungsi getRecentActivities dari jawaban sebelumnya)
 exports.getRecentActivities = async (req, res) => {
     try {
-        // ... (kode switch filter dan params tetap sama) ...
-        const { filter = 'hari', date = new Date(), page = 1, limit = 8 } = req.query;
+        // Menambahkan 'lokasi' sebagai parameter query
+        const { filter = 'hari', date = new Date(), page = 1, limit = 8, lokasi = null } = req.query;
         const targetDate = new Date(date);
         const offset = (page - 1) * limit;
 
+        // Menyiapkan klausa WHERE untuk filter tanggal
         let whereClause = '';
-        let queryParams = filter === 'bulan' ? [targetDate, targetDate] : [targetDate];
-
+        let dateParams = [];
         switch (filter) {
-            case 'minggu': whereClause = 'WHERE YEARWEEK(waktu_clock_in, 1) = YEARWEEK(?, 1)'; break;
-            case 'bulan': whereClause = 'WHERE MONTH(waktu_clock_in) = MONTH(?) AND YEAR(waktu_clock_in) = YEAR(?)'; break;
-            default: whereClause = 'WHERE DATE(waktu_clock_in) = DATE(?)'; break;
+            case 'minggu':
+                whereClause = 'WHERE YEARWEEK(waktu_clock_in, 1) = YEARWEEK(?, 1)';
+                dateParams = [targetDate];
+                break;
+            case 'bulan':
+                whereClause = 'WHERE MONTH(waktu_clock_in) = MONTH(?) AND YEAR(waktu_clock_in) = YEAR(?)';
+                dateParams = [targetDate, targetDate];
+                break;
+            default: // hari
+                whereClause = 'WHERE DATE(waktu_clock_in) = DATE(?)';
+                dateParams = [targetDate];
+                break;
         }
 
-        const countQuery = `SELECT COUNT(*) as total FROM catatan_kehadiran ck ${whereClause}`;
-        const [totalResult] = await pool.query(countQuery, queryParams);
+        // Menyiapkan parameter lokasi
+        const lokasiParams = [lokasi, lokasi];
+        const allParams = [...dateParams, ...lokasiParams];
+
+        // Menghitung total item dengan filter tanggal dan lokasi
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM catatan_kehadiran ck
+                     JOIN pekerja p ON ck.id_pekerja = p.id_pekerja
+                ${whereClause}
+            AND (p.id_lokasi_penugasan = ? OR ? IS NULL)`;
+        const [totalResult] = await pool.query(countQuery, allParams);
         const totalItems = totalResult[0].total;
         const totalPages = Math.ceil(totalItems / limit);
 
-        // --- PERUBAHAN DI QUERY INI ---
+        // Mengambil data aktivitas dengan filter tanggal, lokasi, dan paginasi
         const activityQuery = `
             SELECT
                 p.nama_pengguna,
@@ -193,16 +223,16 @@ exports.getRecentActivities = async (req, res) => {
                 DATE_FORMAT(ck.waktu_clock_in, '%H:%i:%s') as jam_masuk,
                 DATE_FORMAT(ck.waktu_clock_out, '%H:%i:%s') as jam_pulang,
                 ck.status_kehadiran,
-                -- Hitung total jam kerja
                 TIMEDIFF(ck.waktu_clock_out, ck.waktu_clock_in) as total_jam_kerja
             FROM catatan_kehadiran ck
-            JOIN pekerja pk ON ck.id_pekerja = pk.id_pekerja
-            JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
-            ${whereClause}
+                     JOIN pekerja pk ON ck.id_pekerja = pk.id_pekerja
+                     JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+                ${whereClause}
+            AND (pk.id_lokasi_penugasan = ? OR ? IS NULL)
             ORDER BY ck.waktu_clock_in DESC
-            LIMIT ? OFFSET ?`;
+                LIMIT ? OFFSET ?`;
 
-        const [activities] = await pool.query(activityQuery, [...queryParams, parseInt(limit), parseInt(offset)]);
+        const [activities] = await pool.query(activityQuery, [...allParams, parseInt(limit), parseInt(offset)]);
 
         res.json({
             activities,
