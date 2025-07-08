@@ -2,9 +2,14 @@
 
 import axios from 'axios';
 
+// Ingat! penggunaan host ini hanya untuk run di LAN / Network lokal
+const host = window.location.hostname;
+const API_BASE_URL = `http://${host}:5000/api`;
+
 const axiosInstance = axios.create({
-    baseURL: 'http://192.168.0.104:5000/api', // Base URL untuk semua API kita
+    baseURL: API_BASE_URL, // Base URL untuk semua API
 });
+// ------------------------------------------------------------------
 
 // Interceptor untuk setiap PERMINTAAN (REQUEST)
 axiosInstance.interceptors.request.use(
