@@ -73,7 +73,7 @@ exports.getSupervisorSummary = async (req, res) => {
 
         // PERBAIKAN 2: DATA GRAFIK YANG LEBIH LENGKAP
         let trendData = {};
-        const statusList = ['Hadir', 'Telat', 'Izin', 'Lembur', 'Pulang Cepat', 'Absen', 'Belum Hadir'];
+        const statusList = ['Hadir', 'Telat', 'Izin', 'Lembur', 'Pulang Cepat', 'Absen'];
         const statusColors = {
             Hadir: 'rgba(75, 192, 102, 0.7)',
             Telat: 'rgba(255, 206, 86, 0.7)',
