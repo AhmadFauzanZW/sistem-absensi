@@ -22,6 +22,7 @@ app.use('/api/izin', require('./routes/izin'));
 app.use('/api/proyek', require('./routes/proyek'));
 app.use('/api/pekerja', require('./routes/pekerja'));
 app.use('/api/manajemen', require('./routes/manajemenPekerja'));
+app.use('/api/laporan', require('./routes/laporan'));
 // Add other routes here later
 
 const PORT = process.env.PORT || 5000;

@@ -27,6 +27,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     Manager: {
       dashboard: [{ path: '/manager/dashboard', label: 'Dashboard Utama' }],
       pengelolaan: [{ path: '/manager/kelola-pekerja', label: 'Kelola Pekerja' }],
+      pelaporan: [{ path: '/manager/laporan', label: 'Laporan Proyek' }],
     },
     Direktur: {
       dashboard: [{ path: '/direktur/dashboard', label: 'Dashboard Utama' }],
@@ -70,7 +71,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                       : section === 'absensi' ? 'Absensi'
                           : section === 'perizinan' ? 'Perizinan'
                               : section === 'pengelolaan' ? 'Pengelolaan'
-                                  : section}
+                                  : section === 'pelaporan' ? 'Pelaporan'
+                                      : section}
                 </h3>
                 <ul className="space-y-1">
                   {items.map(item => (

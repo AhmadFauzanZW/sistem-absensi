@@ -12,12 +12,11 @@ import RiwayatIzin from './pages/RiwayatIzin';
 import PekerjaProfile from './pages/PekerjaProfile'; // Profil pekerja nyata
 import ManagerDashboard from './pages/ManagerDashboard.jsx'; // Dashboard Manager
 import KelolaPekerja from './pages/KelolaPekerja';
+import LaporanProyek from './pages/LaporanProyek';
 import DirekturDashboard from './pages/DirekturDashboard'; // Dashboard Direktur
 import UnauthorizedPage from './pages/UnauthorizedPage'; // Halaman 403
 
 // Placeholder (opsional)
-const PekerjaDashboard = () => <h1 className="p-4">Halaman Dashboard Pekerja</h1>;
-const LaporanProyek = () => <Layout><h1 className="p-4 text-2xl">Halaman Laporan Proyek (Dalam Pengembangan)</h1></Layout>;
 
 // Komponen untuk redirect otomatis berdasarkan role pengguna
 const AppRoutes = () => {
@@ -106,14 +105,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/pekerja/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={['Pekerja']}>
-                <PekerjaDashboard />
-              </ProtectedRoute>
-            }
-          />
 
           {/* Rute Manager */}
           <Route
@@ -135,7 +126,7 @@ function App() {
           <Route
               path="/manager/laporan"
               element={
-                  <ProtectedRoute allowedRoles={['Manager']}>
+                  <ProtectedRoute allowedRoles={['Manager', 'Direktur']}>
                       <LaporanProyek />
                   </ProtectedRoute>
               }
