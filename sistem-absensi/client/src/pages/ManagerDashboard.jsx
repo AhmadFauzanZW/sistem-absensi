@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import axiosInstance from '../api/axiosInstance';
 import { Link } from 'react-router-dom';
 import StatCard from '../components/StatCard';
 import { Bar } from 'react-chartjs-2'; // Hanya butuh Bar chart
@@ -36,8 +36,8 @@ const ManagerDashboard = () => {
 
             try {
                 const [managerRes, izinRes] = await Promise.all([
-                    axios.get('http://localhost:5000/api/dashboard/manager', { headers, params }),
-                    axios.get('http://localhost:5000/api/izin/validasi', { headers })
+                    axiosInstance.get('dashboard/manager', { headers, params }),
+                    axiosInstance.get('izin/validasi', { headers })
                 ]);
                 setDashboardData(managerRes.data);
                 setIzinUntukValidasi(izinRes.data);

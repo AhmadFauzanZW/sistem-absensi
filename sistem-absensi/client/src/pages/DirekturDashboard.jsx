@@ -7,6 +7,7 @@ import { Line, Bar } from 'react-chartjs-2';
 const DirekturDashboard = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [logs, setLogs] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -26,6 +27,20 @@ const DirekturDashboard = () => {
         };
         fetchData();
     }, []);
+
+    // Fungsi fetch log aktivitas (untuk Direktur)
+    const fetchLogData = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get('http://localhost:5000/api/logs', {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { lokasi: lokasiTerpilih }
+            });
+            setLogs(response.data);
+        } catch (error) {
+            console.error("Gagal mengambil log aktivitas:", error);
+        }
+    };
 
     if (loading) return <Layout><p className="p-6">Memuat Dasbor Direktur...</p></Layout>;
 
@@ -48,8 +63,43 @@ const DirekturDashboard = () => {
                 </div>
                 <div className="bg-white p-6 rounded-lg shadow-md">
                     <h2 className="text-xl font-semibold mb-4">Log Aktivitas Sistem</h2>
-                    <div className="overflow-y-auto h-80">
-                        {/* Tabel untuk menampilkan data.activityLog */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="border-b-2 border-gray-200">
+                            <tr>
+                                <th className="py-2">Waktu</th>
+                                <th className="py-2">Pengguna</th>
+                                <th className="py-2">Aksi</th>
+                                <th className="py-2">Deskripsi</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {logs.length > 0 ? (
+                                logs.map((log, i) => (
+                                    <tr key={i} className="border-b">
+                                        <td className="py-2 pr-4 whitespace-nowrap">
+                                            {new Date(log.waktu_aktivitas).toLocaleString('id-ID')}
+                                        </td>
+                                        <td className="py-2 pr-4">
+                                            {log.nama_pengguna || log.user} ({log.nama_peran || log.role})
+                                        </td>
+                                        <td className="py-2 pr-4">
+                        <span className="bg-gray-200 px-2 py-1 rounded-full text-xs">
+                          {log.tipe_aktivitas || log.action}
+                        </span>
+                                        </td>
+                                        <td className="py-2">{log.deskripsi || log.description}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="4" className="text-center py-4 text-gray-500">
+                                        Tidak ada log aktivitas.
+                                    </td>
+                                </tr>
+                            )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
