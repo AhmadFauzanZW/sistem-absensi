@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
 import { Link } from 'react-router-dom';
-import StatCard from '../components/StatCard';
+import { StatCardSpv } from '../components/StatCard';
 import { Bar } from 'react-chartjs-2'; // Hanya butuh Bar chart
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -121,14 +121,14 @@ const ManagerDashboard = () => {
             {dashboardData && (
                 <>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
-                        <StatCard title="Proyek Aktif" value={dashboardData.summaryCards.totalProyek} icon="🏗️" />
-                        <StatCard title="Total Pekerja" value={dashboardData.summaryCards.totalPekerja} icon="👥" />
-                        <StatCard title={`Hadir (${filter})`} value={dashboardData.summaryCards.hadir} icon="✅" />
-                        <StatCard title={`Telat (${filter})`} value={dashboardData.summaryCards.telat} icon="⚠️" />
-                        <StatCard title={`Izin (${filter})`} value={dashboardData.summaryCards.izin} icon="📝" />
-                        <StatCard title={`Absen (${filter})`} value={dashboardData.summaryCards.absen} icon="❌" />
+                        <StatCardSpv title="Proyek Aktif" value={dashboardData.summaryCards.totalProyek} icon="🏗️" />
+                        <StatCardSpv title="Total Pekerja" value={dashboardData.summaryCards.totalPekerja} icon="👥" />
+                        <StatCardSpv title={`Hadir (${filter})`} value={dashboardData.summaryCards.hadir} icon="✅" />
+                        <StatCardSpv title={`Telat (${filter})`} value={dashboardData.summaryCards.telat} icon="⚠️" />
+                        <StatCardSpv title={`Izin (${filter})`} value={dashboardData.summaryCards.izin} icon="📝" />
+                        <StatCardSpv title={`Absen (${filter})`} value={dashboardData.summaryCards.absen} icon="❌" />
                         {filter === 'hari' && (
-                            <StatCard title="Belum Hadir" value={dashboardData.summaryCards.belum_hadir} icon="❓" />
+                            <StatCardSpv title="Belum Hadir" value={dashboardData.summaryCards.belum_hadir} icon="❓" />
                         )}
                     </div>
 

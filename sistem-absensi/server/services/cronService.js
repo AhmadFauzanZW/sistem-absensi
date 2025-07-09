@@ -51,7 +51,7 @@ const tandaiPekerjaAbsen = async () => {
 };
 
 // Jadwalkan tugas untuk berjalan setiap hari pukul 23:00 (11 malam)
-cron.schedule('0 16 * * *', tandaiPekerjaAbsen, {
+cron.schedule('0 17-23 * * *', tandaiPekerjaAbsen, {
     scheduled: true,
     timezone: "Asia/Jakarta"
 });

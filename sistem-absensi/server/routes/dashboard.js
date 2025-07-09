@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getSupervisorSummary, getRecentActivities, getManagerDashboard } = require('../controllers/dashboardController');
+const { getSupervisorSummary, getRecentActivities, getManagerDashboard, getDirekturDashboard  } = require('../controllers/dashboardController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // --- ROUTE BARU UNTUK MANAGER ---
@@ -13,5 +13,8 @@ router.get('/summary', protect, authorize('Supervisor', 'Manager', 'Direktur'), 
 
 // GET /api/dashboard/activities
 router.get('/activities', protect, authorize('Supervisor', 'Manager', 'Direktur'), getRecentActivities);
+
+// GET /api/dashboard/direktur
+router.get('/direktur', protect, authorize('Direktur'), getDirekturDashboard);
 
 module.exports = router;

@@ -290,6 +290,70 @@ exports.getManagerDashboard = async (req, res) => {
         res.status(500).send("Server Error");
     }
 };
+
+exports.getDirekturDashboard = async (req, res) => {
+    try {
+        const { periode = new Date().toISOString().slice(0, 7) } = req.query; // Default: bulan ini, format YYYY-MM
+
+        // Fungsi untuk menghitung KPI pada rentang tanggal tertentu
+        const calculateKpis = async (startDate, endDate) => {
+            const kpiQuery = `
+                SELECT
+                    (SELECT SUM(p.gaji_harian) FROM catatan_kehadiran ck JOIN pekerja p ON ck.id_pekerja = p.id_pekerja WHERE ck.status_kehadiran IN ('Hadir', 'Telat', 'Lembur', 'Pulang Cepat') AND ck.waktu_clock_in BETWEEN ? AND ?) as total_biaya_gaji,
+                    (SELECT AVG(TIME_TO_SEC(TIMEDIFF(waktu_clock_out, waktu_clock_in))) / 3600 FROM catatan_kehadiran WHERE waktu_clock_out IS NOT NULL AND waktu_clock_in BETWEEN ? AND ?) as produktivitas_rata_rata,
+                    (SELECT (COUNT(CASE WHEN status_kehadiran = 'Absen' THEN 1 END) / COUNT(*)) * 100 FROM catatan_kehadiran WHERE waktu_clock_in BETWEEN ? AND ?) as tingkat_absensi
+            `;
+            const [result] = await pool.query(kpiQuery, [startDate, endDate, startDate, endDate, startDate, endDate]);
+            return result[0];
+        };
+
+        // Hitung untuk periode saat ini
+        const currentStartDate = new Date(periode + '-01');
+        const currentEndDate = new Date(currentStartDate.getFullYear(), currentStartDate.getMonth() + 1, 0);
+        const currentKpis = await calculateKpis(currentStartDate, currentEndDate);
+
+        // Hitung untuk periode sebelumnya
+        const previousStartDate = new Date(currentStartDate);
+        previousStartDate.setMonth(previousStartDate.getMonth() - 1);
+        const previousEndDate = new Date(previousStartDate.getFullYear(), previousStartDate.getMonth() + 1, 0);
+        const previousKpis = await calculateKpis(previousStartDate, previousEndDate);
+
+        // Fungsi untuk menghitung persentase perubahan
+        const getChange = (current, previous) => {
+            if (previous === 0 || previous === null) return 0;
+            return ((current - previous) / previous) * 100;
+        };
+
+        // Gabungkan data dengan perbandingan
+        const kpisWithComparison = {
+            total_biaya_gaji: { value: currentKpis.total_biaya_gaji || 0, change: getChange(currentKpis.total_biaya_gaji, previousKpis.total_biaya_gaji) },
+            produktivitas_rata_rata: { value: currentKpis.produktivitas_rata_rata || 0, change: getChange(currentKpis.produktivitas_rata_rata, previousKpis.produktivitas_rata_rata) },
+            tingkat_absensi: { value: currentKpis.tingkat_absensi || 0, change: getChange(currentKpis.tingkat_absensi, previousKpis.tingkat_absensi) }
+        };
+
+        // --- Query untuk Grafik (tidak berubah banyak, hanya penyesuaian tanggal) ---
+        const biayaChartQuery = `
+            SELECT lp.nama_lokasi, SUM(p.gaji_harian) as total_gaji
+            FROM catatan_kehadiran ck
+            JOIN pekerja p ON ck.id_pekerja = p.id_pekerja
+            JOIN lokasi_proyek lp ON p.id_lokasi_penugasan = lp.id_lokasi
+            WHERE ck.waktu_clock_in BETWEEN ? AND ?
+            GROUP BY lp.id_lokasi, lp.nama_lokasi;
+        `;
+        const [biayaChartResult] = await pool.query(biayaChartQuery, [currentStartDate, currentEndDate]);
+        const biayaChart = {
+            labels: biayaChartResult.map(item => item.nama_lokasi),
+            datasets: [{ label: `Biaya Gaji (Bulan Ini)`, data: biayaChartResult.map(item => item.total_gaji), backgroundColor: 'rgba(54, 162, 235, 0.6)' }]
+        };
+
+        res.json({ kpis: kpisWithComparison, biayaChart });
+
+    } catch (error) {
+        console.error("Error fetching direktur dashboard data:", error);
+        res.status(500).send("Server Error");
+    }
+};
+
 // Ubah exports agar lebih sederhana
 exports.getSupervisorSummary = (req, res) => getDashboardData(req, res, 'summary');
 exports.getRecentActivities = (req, res) => getDashboardData(req, res, 'activities');

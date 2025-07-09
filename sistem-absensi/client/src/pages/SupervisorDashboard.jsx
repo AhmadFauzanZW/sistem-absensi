@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance'; // Tetap gunakan axiosInstance
 import Layout from '../components/Layout';
-import StatCard from '../components/StatCard';
+import { StatCardSpv } from '../components/StatCard';
 
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -180,13 +180,13 @@ const SupervisorDashboard = () => {
 
             {/* Kartu Statistik menggunakan grid untuk responsivitas yang lebih baik */}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-                <StatCard title="Total Aktif" value={summary.total_pekerja ?? 0} icon="👥" />
-                <StatCard title="Hadir" value={summary.hadir ?? 0} icon="✅" />
-                <StatCard title="Terlambat" value={summary.terlambat ?? 0} icon="⚠️" />
-                <StatCard title="Izin" value={summary.izin ?? 0} icon="📝" />
-                <StatCard title="Lembur" value={summary.lembur ?? 0} icon="💼" />
-                <StatCard title="Pulang Cepat" value={summary.pulang_cepat ?? 0} icon="🏃‍♂️" />
-                <StatCard title="Absen" value={summary.absen ?? 0} icon="❌" />
+                <StatCardSpv title="Total Aktif" value={summary.total_pekerja ?? 0} icon="👥" />
+                <StatCardSpv title="Hadir" value={summary.hadir ?? 0} icon="✅" />
+                <StatCardSpv title="Terlambat" value={summary.terlambat ?? 0} icon="⚠️" />
+                <StatCardSpv title="Izin" value={summary.izin ?? 0} icon="📝" />
+                <StatCardSpv title="Lembur" value={summary.lembur ?? 0} icon="💼" />
+                <StatCardSpv title="Pulang Cepat" value={summary.pulang_cepat ?? 0} icon="🏃‍♂️" />
+                <StatCardSpv title="Absen" value={summary.absen ?? 0} icon="❌" />
             </div>
 
             <div className="flex flex-col gap-6">
