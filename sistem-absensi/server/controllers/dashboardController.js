@@ -166,6 +166,116 @@ const getDashboardData = async (req, res, dataType) => {
     }
 };
 
+exports.getManagerDashboard = async (req, res) => {
+    try {
+        const { filter = 'hari', date = new Date().toISOString() } = req.query;
+        const targetDate = new Date(date);
+
+        // Siapkan klausa WHERE untuk filter waktu
+        let whereClause = '';
+        let dateParams = [];
+        switch (filter) {
+            case 'minggu':
+                whereClause = 'AND YEARWEEK(ck.waktu_clock_in, 1) = YEARWEEK(?, 1)';
+                dateParams = [targetDate];
+                break;
+            case 'bulan':
+                whereClause = 'AND MONTH(ck.waktu_clock_in) = MONTH(?) AND YEAR(ck.waktu_clock_in) = YEAR(?)';
+                dateParams = [targetDate, targetDate];
+                break;
+            default: // hari
+                whereClause = 'AND DATE(ck.waktu_clock_in) = DATE(?)';
+                dateParams = [targetDate];
+                break;
+        }
+
+        // --- Query 1: Kartu Ringkasan Agregat (dengan filter waktu) ---
+        const summaryPromises = [
+            pool.query("SELECT COUNT(*) as total FROM lokasi_proyek WHERE status_proyek = 'Aktif'"),
+            pool.query("SELECT COUNT(*) as total FROM pengguna WHERE id_peran = (SELECT id_peran FROM peran WHERE nama_peran = 'Supervisor') AND status_pengguna = 'Aktif'"),
+            pool.query("SELECT COUNT(*) as total FROM pekerja p JOIN pengguna u ON p.id_pengguna = u.id_pengguna WHERE u.status_pengguna = 'Aktif'"),
+            pool.query(`
+                SELECT 
+                    COUNT(DISTINCT CASE WHEN status_kehadiran IN ('Hadir', 'Lembur', 'Pulang Cepat') THEN id_pekerja END) as hadir,
+                    COUNT(DISTINCT CASE WHEN status_kehadiran = 'Telat' THEN id_pekerja END) as telat,
+                    COUNT(DISTINCT CASE WHEN status_kehadiran = 'Izin' THEN id_pekerja END) as izin
+                FROM catatan_kehadiran ck WHERE 1=1 ${whereClause.replace('ck.', '')}
+            `, dateParams)
+        ];
+
+        const [[proyekResult], [supervisorResult], [pekerjaResult], [kehadiranResult]] = await Promise.all(summaryPromises);
+
+        const totalPekerja = pekerjaResult[0].total;
+        const totalHadirDanIzin = (kehadiranResult[0].hadir || 0) + (kehadiranResult[0].telat || 0) + (kehadiranResult[0].izin || 0);
+
+        const summaryCards = {
+            totalProyek: proyekResult[0].total,
+            totalSupervisor: supervisorResult[0].total,
+            totalPekerja: totalPekerja,
+            ...kehadiranResult[0],
+            absen: totalPekerja - totalHadirDanIzin // Kalkulasi Absen
+        };
+
+        // --- Query 2: Data Tabel "Denyut Nadi Proyek" (dengan filter waktu) ---
+        const projectPulseQuery = `
+            SELECT
+                lp.id_lokasi, lp.nama_lokasi,
+                (SELECT p.nama_pengguna FROM pengguna p JOIN penugasan_pengawas pp ON p.id_pengguna = pp.id_pengguna_supervisor WHERE pp.id_lokasi = lp.id_lokasi LIMIT 1) AS nama_supervisor,
+                COUNT(DISTINCT pk.id_pekerja) AS total_pekerja_proyek,
+                (SELECT COUNT(DISTINCT ck.id_pekerja) FROM catatan_kehadiran ck WHERE ck.id_pekerja IN (SELECT id_pekerja FROM pekerja WHERE id_lokasi_penugasan = lp.id_lokasi) AND ck.status_kehadiran IN ('Hadir', 'Telat', 'Lembur', 'Pulang Cepat') ${whereClause}) AS total_hadir,
+                (SELECT COUNT(DISTINCT ck.id_pekerja) FROM catatan_kehadiran ck WHERE ck.id_pekerja IN (SELECT id_pekerja FROM pekerja WHERE id_lokasi_penugasan = lp.id_lokasi) AND ck.status_kehadiran = 'Telat' ${whereClause}) AS total_telat,
+                (SELECT COUNT(DISTINCT ck.id_pekerja) FROM catatan_kehadiran ck WHERE ck.id_pekerja IN (SELECT id_pekerja FROM pekerja WHERE id_lokasi_penugasan = lp.id_lokasi) AND ck.status_kehadiran = 'Absen' ${whereClause}) AS total_absen
+            FROM lokasi_proyek lp
+            LEFT JOIN pekerja pk ON lp.id_lokasi = pk.id_lokasi_penugasan
+            WHERE lp.status_proyek = 'Aktif'
+            GROUP BY lp.id_lokasi, lp.nama_lokasi ORDER BY lp.nama_lokasi;
+        `;
+        const [projectPulse] = await pool.query(projectPulseQuery, [...dateParams, ...dateParams, ...dateParams]);
+
+
+        // --- Query 3: Data untuk Grafik Perbandingan Proyek ---
+        const projectChartQuery = `
+            SELECT 
+                lp.nama_lokasi,
+                COUNT(DISTINCT pk.id_pekerja) as total_pekerja,
+                COUNT(DISTINCT CASE WHEN ck.status_kehadiran IN ('Hadir', 'Telat', 'Lembur', 'Pulang Cepat') THEN ck.id_pekerja END) as total_hadir
+            FROM lokasi_proyek lp
+            LEFT JOIN pekerja pk ON lp.id_lokasi = pk.id_lokasi_penugasan
+            LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja ${whereClause}
+            WHERE lp.status_proyek = 'Aktif'
+            GROUP BY lp.id_lokasi, lp.nama_lokasi
+            ORDER BY lp.nama_lokasi;
+        `;
+        const [projectChartData] = await pool.query(projectChartQuery, dateParams);
+
+        const chartData = {
+            type: 'bar',
+            labels: projectChartData.map(p => p.nama_lokasi),
+            datasets: [
+                {
+                    label: 'Total Pekerja',
+                    data: projectChartData.map(p => p.total_pekerja),
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                },
+                {
+                    label: 'Total Hadir',
+                    data: projectChartData.map(p => p.total_hadir),
+                    backgroundColor: 'rgba(75, 192, 102, 0.5)',
+                    borderColor: 'rgba(75, 192, 102, 1)',
+                    borderWidth: 1,
+                }
+            ]
+        };
+
+        res.json({ summaryCards, projectPulse, chartData });
+
+    } catch (error) {
+        console.error("Error fetching manager dashboard data:", error);
+        res.status(500).send("Server Error");
+    }
+};
 // Ubah exports agar lebih sederhana
 exports.getSupervisorSummary = (req, res) => getDashboardData(req, res, 'summary');
 exports.getRecentActivities = (req, res) => getDashboardData(req, res, 'activities');

@@ -15,6 +15,8 @@ import UnauthorizedPage from './pages/UnauthorizedPage'; // Halaman 403
 
 // Placeholder (opsional)
 const PekerjaDashboard = () => <h1 className="p-4">Halaman Dashboard Pekerja</h1>;
+const KelolaPekerja = () => <Layout><h1 className="p-4 text-2xl">Halaman Kelola Pekerja (Dalam Pengembangan)</h1></Layout>;
+const LaporanProyek = () => <Layout><h1 className="p-4 text-2xl">Halaman Laporan Proyek (Dalam Pengembangan)</h1></Layout>;
 
 // Komponen untuk redirect otomatis berdasarkan role pengguna
 const AppRoutes = () => {
@@ -112,6 +114,22 @@ function App() {
                 <AdminDashboard />
               </ProtectedRoute>
             }
+          />
+          <Route
+              path="/manager/kelola-pekerja"
+              element={
+                  <ProtectedRoute allowedRoles={['Manager']}>
+                      <KelolaPekerja />
+                  </ProtectedRoute>
+              }
+          />
+          <Route
+              path="/manager/laporan"
+              element={
+                  <ProtectedRoute allowedRoles={['Manager']}>
+                      <LaporanProyek />
+                  </ProtectedRoute>
+              }
           />
 
           {/* Fallback - 404 Page Not Found */}
