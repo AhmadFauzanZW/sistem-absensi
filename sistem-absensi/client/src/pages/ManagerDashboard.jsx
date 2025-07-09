@@ -128,7 +128,7 @@ const ManagerDashboard = () => {
                         <StatCard title={`Izin (${filter})`} value={dashboardData.summaryCards.izin} icon="📝" />
                         <StatCard title={`Absen (${filter})`} value={dashboardData.summaryCards.absen} icon="❌" />
                         {filter === 'hari' && (
-                            <StatCard title="Belum Hadir" value={dashboardData.summaryCards.belum_hadir} icon="🤔" />
+                            <StatCard title="Belum Hadir" value={dashboardData.summaryCards.belum_hadir} icon="❓" />
                         )}
                     </div>
 
