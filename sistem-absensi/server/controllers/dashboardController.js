@@ -198,7 +198,8 @@ exports.getManagerDashboard = async (req, res) => {
                 SELECT 
                     COUNT(DISTINCT CASE WHEN status_kehadiran IN ('Hadir', 'Lembur', 'Pulang Cepat') THEN id_pekerja END) as hadir,
                     COUNT(DISTINCT CASE WHEN status_kehadiran = 'Telat' THEN id_pekerja END) as telat,
-                    COUNT(DISTINCT CASE WHEN status_kehadiran = 'Izin' THEN id_pekerja END) as izin
+                    COUNT(DISTINCT CASE WHEN status_kehadiran = 'Izin' THEN id_pekerja END) as izin,
+                    COUNT(DISTINCT CASE WHEN status_kehadiran = 'Absen' THEN id_pekerja END) as absen
                 FROM catatan_kehadiran ck WHERE 1=1 ${whereClause.replace('ck.', '')}
             `, dateParams)
         ];
@@ -206,14 +207,26 @@ exports.getManagerDashboard = async (req, res) => {
         const [[proyekResult], [supervisorResult], [pekerjaResult], [kehadiranResult]] = await Promise.all(summaryPromises);
 
         const totalPekerja = pekerjaResult[0].total;
-        const totalHadirDanIzin = (kehadiranResult[0].hadir || 0) + (kehadiranResult[0].telat || 0) + (kehadiranResult[0].izin || 0);
+        const summary = kehadiranResult[0]; // Hasil query langsung dari db
+
+        const totalHadirRiil = (summary.hadir || 0); // Query Anda sudah menghitung ini dengan benar
+
+
+        let belumHadir = 0;
+        if (filter === 'hari') {
+            const totalTercatat = totalHadirRiil + (summary.telat || 0) + (summary.izin || 0) + (summary.absen || 0);
+            belumHadir = totalPekerja - totalTercatat;
+        }
 
         const summaryCards = {
             totalProyek: proyekResult[0].total,
             totalSupervisor: supervisorResult[0].total,
             totalPekerja: totalPekerja,
-            ...kehadiranResult[0],
-            absen: totalPekerja - totalHadirDanIzin // Kalkulasi Absen
+            hadir: summary.hadir || 0,
+            telat: summary.telat || 0,
+            izin: summary.izin || 0,
+            absen: summary.absen || 0, // Ambil data 'Absen' langsung dari DB
+            belum_hadir: belumHadir < 0 ? 0 : belumHadir // Pastikan tidak negatif
         };
 
         // --- Query 2: Data Tabel "Denyut Nadi Proyek" (dengan filter waktu) ---
@@ -224,13 +237,14 @@ exports.getManagerDashboard = async (req, res) => {
                 COUNT(DISTINCT pk.id_pekerja) AS total_pekerja_proyek,
                 (SELECT COUNT(DISTINCT ck.id_pekerja) FROM catatan_kehadiran ck WHERE ck.id_pekerja IN (SELECT id_pekerja FROM pekerja WHERE id_lokasi_penugasan = lp.id_lokasi) AND ck.status_kehadiran IN ('Hadir', 'Telat', 'Lembur', 'Pulang Cepat') ${whereClause}) AS total_hadir,
                 (SELECT COUNT(DISTINCT ck.id_pekerja) FROM catatan_kehadiran ck WHERE ck.id_pekerja IN (SELECT id_pekerja FROM pekerja WHERE id_lokasi_penugasan = lp.id_lokasi) AND ck.status_kehadiran = 'Telat' ${whereClause}) AS total_telat,
+                (SELECT COUNT(DISTINCT ck.id_pekerja) FROM catatan_kehadiran ck WHERE ck.id_pekerja IN (SELECT id_pekerja FROM pekerja WHERE id_lokasi_penugasan = lp.id_lokasi) AND ck.status_kehadiran = 'Izin' ${whereClause}) AS total_izin,
                 (SELECT COUNT(DISTINCT ck.id_pekerja) FROM catatan_kehadiran ck WHERE ck.id_pekerja IN (SELECT id_pekerja FROM pekerja WHERE id_lokasi_penugasan = lp.id_lokasi) AND ck.status_kehadiran = 'Absen' ${whereClause}) AS total_absen
             FROM lokasi_proyek lp
             LEFT JOIN pekerja pk ON lp.id_lokasi = pk.id_lokasi_penugasan
             WHERE lp.status_proyek = 'Aktif'
             GROUP BY lp.id_lokasi, lp.nama_lokasi ORDER BY lp.nama_lokasi;
         `;
-        const [projectPulse] = await pool.query(projectPulseQuery, [...dateParams, ...dateParams, ...dateParams]);
+        const [projectPulse] = await pool.query(projectPulseQuery, [...dateParams, ...dateParams, ...dateParams, ...dateParams]);
 
 
         // --- Query 3: Data untuk Grafik Perbandingan Proyek ---

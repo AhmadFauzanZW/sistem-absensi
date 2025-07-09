@@ -22,7 +22,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   ];
 
   const managerMenu = [
-    { path: '/admin/dashboard', label: 'Dashboard Utama' },
+    { path: '/manager/dashboard', label: 'Dashboard Utama' },
     { path: '/pengajuan-izin', label: 'Pengajuan Izin', roles: ['Pekerja', 'Supervisor', 'Manager'] },
     { path: '/riwayat-izin', label: 'Riwayat Izin', roles: ['Pekerja', 'Supervisor', 'Manager', 'Direktur'] },
     // { path: '/admin/laporan', label: 'Laporan Proyek' },
@@ -30,7 +30,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   ];
 
   const direkturMenu = [
-    { path: '/admin/dashboard', label: 'Dashboard Utama' },
+    { path: '/direktur/dashboard', label: 'Dashboard Utama' },
     { path: '/riwayat-izin', label: 'Riwayat Izin', roles: ['Pekerja', 'Supervisor', 'Manager', 'Direktur'] },
   ];
 

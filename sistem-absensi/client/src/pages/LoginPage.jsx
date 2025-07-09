@@ -36,10 +36,10 @@ const LoginPage = () => {
           navigate('/pekerja/profil');
           break;
         case 'Manager':
-          navigate('/admin/dashboard');
+          navigate('/manager/dashboard');
           break;
         case 'Direktur':
-          navigate('/admin/dashboard');
+          navigate('/direktur/dashboard');
           break;
         default:
           navigate('/');
