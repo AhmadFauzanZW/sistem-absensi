@@ -21,12 +21,25 @@ const ManagerDashboard = () => {
     const [filter, setFilter] = useState('hari');
     const [selectedDate, setSelectedDate] = useState(new Date());
 
+    const fetchIzinData = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axiosInstance.get('/izin/validasi', {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setIzinUntukValidasi(response.data);
+        } catch (error) {
+            console.error("Gagal mengambil data validasi izin:", error);
+        }
+    };
+
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             setError(null);
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
+
 
             // --- Tambahkan parameter filter waktu ke API call ---
             const params = {
@@ -51,6 +64,34 @@ const ManagerDashboard = () => {
 
         fetchData();
     }, [user.role, filter, selectedDate]); // Tambahkan filter dan selectedDate sebagai dependensi
+
+    const handleAction = async (id_pengajuan, aksi) => {
+        let catatan = '';
+
+        if (aksi === 'tolak') {
+            let alasan = '';
+            do {
+                alasan = window.prompt('Mohon masukkan alasan penolakan:');
+                if (alasan === null) return;
+            } while (!alasan.trim());
+            catatan = alasan;
+        } else {
+            const catatanOpsional = window.prompt('Tambahkan catatan (opsional):', 'Disetujui');
+            if (catatanOpsional === null) return;
+            catatan = catatanOpsional;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            await axiosInstance.put(`/izin/${id_pengajuan}/proses`,
+                { aksi, catatan }, // <-- KIRIM 'catatan' DI SINI
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            fetchIzinData(); // Refresh list
+        } catch (error) {
+            alert(`Gagal memproses. ${error.response?.data?.message || ''}`);
+        }
+    };
 
     if (loading) return <Layout><div className="text-center p-10">Memuat Dashboard...</div></Layout>;
     if (error) return <Layout><div className="text-center p-10 text-red-500">{error}</div></Layout>;
