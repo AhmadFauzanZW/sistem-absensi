@@ -33,17 +33,16 @@ axiosInstance.interceptors.response.use(
     },
     (error) => {
         // Cek jika error adalah karena token tidak valid (401)
-        if (error.response && error.response.status === 401) {
+        if (error.response?.status === 401 && originalRequest.url !== '/api/auth/login') {
             // Hapus data yang tidak valid
             localStorage.removeItem('token');
             localStorage.removeItem('user');
 
             // Arahkan ke halaman login
-            // Gunakan window.location agar halaman refresh total dan state kembali bersih
-            window.location.href = '/login';
-
             // Beri pesan (opsional)
             alert('Sesi Anda telah berakhir. Silakan login kembali.');
+            // Gunakan window.location agar halaman refresh total dan state kembali bersih
+            window.location.href = '/login';
         }
 
         // Kembalikan error agar bisa ditangani oleh .catch() jika perlu
