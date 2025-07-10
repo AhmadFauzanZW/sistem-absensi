@@ -182,22 +182,41 @@ exports.catatKehadiran = async (req, res) => {
 
 exports.getTodayWorkerStatus = async (req, res) => {
     try {
-        const { id_pengguna } = req.user; // ID Supervisor
-        // Ambil semua pekerja yang berada di lokasi yang diawasi supervisor
+        const { id } = req.user; // ID Supervisor - using 'id' field from JWT payload
+        
+        // Check if the supervisor has any assignments
+        const [assignments] = await pool.query(
+            'SELECT id_lokasi FROM penugasan_pengawas WHERE id_pengguna_supervisor = ?',
+            [id]
+        );
+        
+        // If no assignments found, return empty array
+        if (assignments.length === 0) {
+            return res.json([]);
+        }
+        
+        const locationIds = assignments.map(assignment => assignment.id_lokasi);
+        
+        // Build parameterized query for multiple location IDs
+        const placeholders = locationIds.map(() => '?').join(',');
         const query = `
             SELECT 
-                pk.id_pekerja, p.nama_pengguna, jp.nama_pekerjaan,
-                ck.waktu_clock_in, ck.waktu_clock_out, ck.status_kehadiran
+                pk.id_pekerja, 
+                p.nama_pengguna, 
+                jp.nama_pekerjaan,
+                ck.waktu_clock_in, 
+                ck.waktu_clock_out, 
+                ck.status_kehadiran
             FROM pekerja pk
             JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
             LEFT JOIN jenis_pekerjaan jp ON pk.id_jenis_pekerjaan = jp.id_jenis_pekerjaan
             LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja AND DATE(ck.waktu_clock_in) = CURDATE()
-            WHERE pk.id_lokasi_penugasan IN (
-                SELECT id_lokasi FROM penugasan_pengawas WHERE id_pengguna_supervisor = ?
-            ) AND p.status_pengguna = 'Aktif'
+            WHERE pk.id_lokasi_penugasan IN (${placeholders}) 
+            AND p.status_pengguna = 'Aktif'
             ORDER BY p.nama_pengguna;
         `;
-        const [workers] = await pool.query(query, [id_pengguna]);
+        
+        const [workers] = await pool.query(query, locationIds);
         res.json(workers);
     } catch (error) {
         console.error("Error fetching today's worker status:", error);
