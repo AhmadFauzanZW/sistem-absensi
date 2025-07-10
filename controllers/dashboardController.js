@@ -16,6 +16,7 @@ const getDisplayPeriod = (filter, date) => {
     return '';
 };
 
+// Supervisor Dashboard Functions
 exports.getSupervisorSummary = async (req, res) => {
     try {
         const { filter = 'hari', date = new Date(), lokasiId = null } = req.query;
