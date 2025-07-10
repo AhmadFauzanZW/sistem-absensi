@@ -48,7 +48,7 @@ exports.getAllWorkers = async (req, res) => {
 
         const dataQuery = `
             SELECT 
-                pk.id_pekerja, p.id_pengguna, p.nama_pengguna, p.email, p.status_pengguna, p.waktu_dibuat,
+                pk.id_pekerja, p.id_pengguna, p.nama_pengguna, p.no_telpon, pk.alamat, p.email, p.status_pengguna, p.waktu_dibuat,
                 lp.nama_lokasi, j.nama_pekerjaan, pk.gaji_harian
             ${baseQuery} ${whereClause}
             ORDER BY ${safeSortBy} ${safeSortOrder}
@@ -69,7 +69,7 @@ exports.getAllWorkers = async (req, res) => {
 
 // 2. Menambah pekerja baru (dengan transaksi)
 exports.addWorker = async (req, res) => {
-    const { nama_pengguna, email, password, id_jenis_pekerjaan, id_lokasi_penugasan, gaji_harian } = req.body;
+    const { nama_pengguna, no_telpon, alamat, email, password, id_jenis_pekerjaan, id_lokasi_penugasan, gaji_harian } = req.body;
 
     // Ambil koneksi dari pool untuk transaksi
     const connection = await pool.getConnection();
@@ -81,18 +81,18 @@ exports.addWorker = async (req, res) => {
         // Langkah 1: Buat entri di tabel 'pengguna'
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(password, salt);
-        const peranPekerjaId = 3; // Asumsi id_peran untuk 'Pekerja' adalah 3
+        const peranPekerjaId = 4; // Asumsi id_peran untuk 'Pekerja' adalah 4
 
         const [userResult] = await connection.query(
-            'INSERT INTO pengguna (nama_pengguna, email, password_hash, id_peran, status_pengguna) VALUES (?, ?, ?, ?, ?)',
-            [nama_pengguna, email, password_hash, peranPekerjaId, 'Aktif']
+            'INSERT INTO pengguna (nama_pengguna, no_telpon, email, password_hash, id_peran, status_pengguna) VALUES (?, ?, ?, ?, ?, ?)',
+            [nama_pengguna, no_telpon, email, password_hash, peranPekerjaId, 'Aktif']
         );
         const newUserId = userResult.insertId;
 
         // Langkah 2: Buat entri di tabel 'pekerja'
         await connection.query(
-            'INSERT INTO pekerja (id_pengguna, id_jenis_pekerjaan, id_lokasi_penugasan, gaji_harian) VALUES (?, ?, ?, ?)',
-            [newUserId, id_jenis_pekerjaan, id_lokasi_penugasan, gaji_harian]
+            'INSERT INTO pekerja (id_pengguna, id_jenis_pekerjaan, alamat, id_lokasi_penugasan, gaji_harian) VALUES (?, ?, ?, ?, ?)',
+            [newUserId, id_jenis_pekerjaan, alamat, id_lokasi_penugasan, gaji_harian]
         );
 
         // Jika semua berhasil, commit transaksi
@@ -117,19 +117,19 @@ exports.addWorker = async (req, res) => {
 // 3. Mengubah data pekerja
 exports.updateWorker = async (req, res) => {
     const { id_pekerja } = req.params;
-    const { id_pengguna, nama_pengguna, email, id_jenis_pekerjaan, id_lokasi_penugasan, gaji_harian } = req.body;
+    const { id_pengguna, nama_pengguna, no_telpon, alamat, email, id_jenis_pekerjaan, id_lokasi_penugasan, gaji_harian } = req.body;
 
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
         await connection.query(
-            'UPDATE pengguna SET nama_pengguna = ?, email = ? WHERE id_pengguna = ?',
-            [nama_pengguna, email, id_pengguna]
+            'UPDATE pengguna SET nama_pengguna = ?, no_telpon = ?, email = ? WHERE id_pengguna = ?',
+            [nama_pengguna, no_telpon, email, id_pengguna]
         );
         await connection.query(
-            'UPDATE pekerja SET id_jenis_pekerjaan = ?, id_lokasi_penugasan = ?, gaji_harian = ? WHERE id_pekerja = ?',
-            [id_jenis_pekerjaan, id_lokasi_penugasan, gaji_harian, id_pekerja]
+            'UPDATE pekerja SET id_jenis_pekerjaan = ?, alamat = ?, id_lokasi_penugasan = ?, gaji_harian = ? WHERE id_pekerja = ?',
+            [id_jenis_pekerjaan, alamat, id_lokasi_penugasan, gaji_harian, id_pekerja]
         );
 
         await connection.commit();
