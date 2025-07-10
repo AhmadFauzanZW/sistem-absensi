@@ -179,3 +179,53 @@ exports.catatKehadiran = async (req, res) => {
         res.status(500).json({ message: "Terjadi kesalahan pada server." });
     }
 };
+
+exports.getTodayWorkerStatus = async (req, res) => {
+    try {
+        const { id_pengguna } = req.user; // ID Supervisor
+        // Ambil semua pekerja yang berada di lokasi yang diawasi supervisor
+        const query = `
+            SELECT 
+                pk.id_pekerja, p.nama_pengguna, jp.nama_pekerjaan,
+                ck.waktu_clock_in, ck.waktu_clock_out, ck.status_kehadiran
+            FROM pekerja pk
+            JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+            LEFT JOIN jenis_pekerjaan jp ON pk.id_jenis_pekerjaan = jp.id_jenis_pekerjaan
+            LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja AND DATE(ck.waktu_clock_in) = CURDATE()
+            WHERE pk.id_lokasi_penugasan IN (
+                SELECT id_lokasi FROM penugasan_pengawas WHERE id_pengguna_supervisor = ?
+            ) AND p.status_pengguna = 'Aktif'
+            ORDER BY p.nama_pengguna;
+        `;
+        const [workers] = await pool.query(query, [id_pengguna]);
+        res.json(workers);
+    } catch (error) {
+        console.error("Error fetching today's worker status:", error);
+        res.status(500).send("Server Error");
+    }
+};
+
+exports.recordAttendanceByQR = async (req, res) => {
+    const { qrCode, tipeAksi, idLokasi } = req.body;
+    try {
+        // Cari pekerja berdasarkan QR code
+        const [workerRows] = await pool.query('SELECT id_pekerja FROM pekerja WHERE kode_qr = ?', [qrCode]);
+        if (workerRows.length === 0) {
+            return res.status(404).json({ message: 'Kode QR tidak valid atau tidak terdaftar.' });
+        }
+        const { id_pekerja } = workerRows[0];
+
+        // Panggil fungsi catatKehadiran yang sudah ada (DRY Principle)
+        req.body = {
+            id_pekerja,
+            tipe_aksi: tipeAksi,
+            metode: 'QR',
+            id_lokasi: idLokasi
+        };
+        return exports.catatKehadiran(req, res);
+
+    } catch (error) {
+        console.error("Error recording attendance by QR:", error);
+        res.status(500).send("Server Error");
+    }
+};
