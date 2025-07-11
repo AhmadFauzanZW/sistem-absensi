@@ -49,7 +49,7 @@ exports.getAllWorkers = async (req, res) => {
         const dataQuery = `
             SELECT 
                 pk.id_pekerja, p.id_pengguna, p.nama_pengguna, p.no_telpon, pk.alamat, p.email, p.status_pengguna, p.waktu_dibuat,
-                lp.nama_lokasi, j.nama_pekerjaan, pk.gaji_harian
+                lp.nama_lokasi, j.nama_pekerjaan, pk.gaji_harian, pk.kode_qr, pk.face_registered
             ${baseQuery} ${whereClause}
             ORDER BY ${safeSortBy} ${safeSortOrder}
             LIMIT ? OFFSET ?
@@ -167,4 +167,48 @@ exports.getMetaData = async (req, res) => {
         console.error("Error fetching metadata:", error);
         res.status(500).send("Server Error");
     }
-}
+};
+
+// 6. Generate QR Code untuk pekerja
+exports.generateQRCode = async (req, res) => {
+    const { id_pekerja } = req.params;
+    const { qr_code } = req.body;
+
+    try {
+        // Update QR code untuk pekerja
+        await pool.query('UPDATE pekerja SET kode_qr = ? WHERE id_pekerja = ?', [qr_code, id_pekerja]);
+        
+        res.json({ 
+            success: true, 
+            message: 'QR Code berhasil disimpan',
+            qr_code: qr_code
+        });
+    } catch (error) {
+        console.error("Error saving QR code:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Gagal menyimpan QR Code" 
+        });
+    }
+};
+
+// 7. Update face registration status
+exports.updateFaceRegistration = async (req, res) => {
+    const { id_pekerja } = req.params;
+
+    try {
+        // Update face_registered flag
+        await pool.query('UPDATE pekerja SET face_registered = 1 WHERE id_pekerja = ?', [id_pekerja]);
+        
+        res.json({ 
+            success: true, 
+            message: 'Status face registration berhasil diupdate'
+        });
+    } catch (error) {
+        console.error("Error updating face registration:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Gagal update face registration" 
+        });
+    }
+};

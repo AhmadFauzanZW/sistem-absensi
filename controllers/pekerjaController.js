@@ -249,3 +249,28 @@ exports.getAttendanceHistory = async (req, res) => {
         res.status(500).send("Server Error");
     }
 };
+
+exports.getFaceData = async (req, res) => {
+    try {
+        // Ambil semua pekerja dengan foto profil untuk face recognition
+        const [workers] = await pool.query(`
+            SELECT 
+                pk.id_pekerja, 
+                p.nama_pengguna,
+                pk.foto_profil_path as foto_profil
+            FROM pekerja pk
+                JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+            WHERE p.status_pengguna = 'Aktif' 
+            AND pk.foto_profil_path IS NOT NULL 
+            AND pk.foto_profil_path != ''
+            ORDER BY p.nama_pengguna
+        `);
+        
+        console.log(`Found ${workers.length} workers with face data`);
+        res.json(workers);
+        
+    } catch (error) {
+        console.error("Error fetching face data:", error);
+        res.status(500).json({ message: "Gagal mengambil data wajah pekerja" });
+    }
+};

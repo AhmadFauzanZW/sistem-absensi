@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const fs = require('fs');
 const path = require('path');
+const { logActivity } = require('./logController');
 
 exports.getCatatanKehadiran = async (req, res) => {
     try {
@@ -47,38 +48,92 @@ exports.getCatatanKehadiran = async (req, res) => {
 
 exports.getAbsensiMingguan = async (req, res) => {
     try {
+        const { id } = req.user; // ID Supervisor - using 'id' field from JWT payload
+        
         // Ambil tanggal dari query, jika tidak ada, gunakan tanggal hari ini
         const tanggalPilihan = req.query.tanggal || new Date().toISOString().slice(0, 10);
 
-        // Query ini akan melakukan 'PIVOT' data kehadiran
-        // dari format baris menjadi format kolom per hari untuk satu minggu.
-        const query = `
-            SELECT
-                pk.id_pekerja,
-                p.nama_pengguna AS nama_lengkap,
-                jpk.nama_pekerjaan,
-                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 2 THEN ck.status_kehadiran END), 'N/A') AS Senin,
-                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 3 THEN ck.status_kehadiran END), 'N/A') AS Selasa,
-                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 4 THEN ck.status_kehadiran END), 'N/A') AS Rabu,
-                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 5 THEN ck.status_kehadiran END), 'N/A') AS Kamis,
-                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 6 THEN ck.status_kehadiran END), 'N/A') AS Jumat,
-                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 7 THEN ck.status_kehadiran END), 'N/A') AS Sabtu,
-                COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 1 THEN ck.status_kehadiran END), 'N/A') AS Minggu
-            FROM
-                pekerja pk
-                    JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
-                    LEFT JOIN jenis_pekerjaan jpk ON pk.id_jenis_pekerjaan = jpk.id_jenis_pekerjaan
-                    LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja
-                    AND YEARWEEK(ck.waktu_clock_in, 1) = YEARWEEK(?, 1) -- filter berdasarkan minggu dari tanggal yang dipilih
-            GROUP BY
-                pk.id_pekerja, -- <-- PERBAIKAN DI SINI (p.id_pekerja -> pk.id_pekerja)
-                p.nama_pengguna,
-                jpk.nama_pekerjaan
-            ORDER BY
-                p.nama_pengguna;
-        `;
+        console.log('Fetching weekly report for supervisor ID:', id, 'date:', tanggalPilihan);
+        
+        // Check if the supervisor has any assignments
+        const [assignments] = await pool.query(
+            'SELECT id_lokasi FROM penugasan_pengawas WHERE id_pengguna_supervisor = ?',
+            [id]
+        );
+        
+        console.log('Supervisor assignments for weekly report:', assignments);
+        
+        let query;
+        let queryParams = [tanggalPilihan];
+        
+        if (assignments.length === 0) {
+            console.log('No assignments found for supervisor, returning all workers for weekly report');
+            // If no assignments found, return all workers (fallback for development/testing)
+            query = `
+                SELECT
+                    pk.id_pekerja,
+                    p.nama_pengguna AS nama_pengguna,
+                    jpk.nama_pekerjaan,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 2 THEN ck.status_kehadiran END), 'N/A') AS Senin,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 3 THEN ck.status_kehadiran END), 'N/A') AS Selasa,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 4 THEN ck.status_kehadiran END), 'N/A') AS Rabu,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 5 THEN ck.status_kehadiran END), 'N/A') AS Kamis,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 6 THEN ck.status_kehadiran END), 'N/A') AS Jumat,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 7 THEN ck.status_kehadiran END), 'N/A') AS Sabtu,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 1 THEN ck.status_kehadiran END), 'N/A') AS Minggu
+                FROM
+                    pekerja pk
+                        JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+                        LEFT JOIN jenis_pekerjaan jpk ON pk.id_jenis_pekerjaan = jpk.id_jenis_pekerjaan
+                        LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja
+                        AND YEARWEEK(ck.waktu_clock_in, 1) = YEARWEEK(?, 1)
+                WHERE p.status_pengguna = 'Aktif'
+                GROUP BY
+                    pk.id_pekerja,
+                    p.nama_pengguna,
+                    jpk.nama_pekerjaan
+                ORDER BY
+                    p.nama_pengguna;
+            `;
+        } else {
+            const locationIds = assignments.map(assignment => assignment.id_lokasi);
+            const placeholders = locationIds.map(() => '?').join(',');
+            
+            query = `
+                SELECT
+                    pk.id_pekerja,
+                    p.nama_pengguna AS nama_pengguna,
+                    jpk.nama_pekerjaan,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 2 THEN ck.status_kehadiran END), 'N/A') AS Senin,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 3 THEN ck.status_kehadiran END), 'N/A') AS Selasa,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 4 THEN ck.status_kehadiran END), 'N/A') AS Rabu,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 5 THEN ck.status_kehadiran END), 'N/A') AS Kamis,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 6 THEN ck.status_kehadiran END), 'N/A') AS Jumat,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 7 THEN ck.status_kehadiran END), 'N/A') AS Sabtu,
+                    COALESCE(MAX(CASE WHEN DAYOFWEEK(ck.waktu_clock_in) = 1 THEN ck.status_kehadiran END), 'N/A') AS Minggu
+                FROM
+                    pekerja pk
+                        JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+                        LEFT JOIN jenis_pekerjaan jpk ON pk.id_jenis_pekerjaan = jpk.id_jenis_pekerjaan
+                        LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja
+                        AND YEARWEEK(ck.waktu_clock_in, 1) = YEARWEEK(?, 1)
+                WHERE pk.id_lokasi_penugasan IN (${placeholders}) 
+                AND p.status_pengguna = 'Aktif'
+                GROUP BY
+                    pk.id_pekerja,
+                    p.nama_pengguna,
+                    jpk.nama_pekerjaan
+                ORDER BY
+                    p.nama_pengguna;
+            `;
+            queryParams = [tanggalPilihan, ...locationIds];
+        }
+        
+        console.log('Executing weekly report query:', query);
+        console.log('Query params:', queryParams);
 
-        const [pekerjaList] = await pool.query(query, [tanggalPilihan]);
+        const [pekerjaList] = await pool.query(query, queryParams);
+        console.log('Found', pekerjaList.length, 'workers for weekly report');
         res.json(pekerjaList);
 
     } catch (error) {
@@ -88,7 +143,7 @@ exports.getAbsensiMingguan = async (req, res) => {
 };
 
 exports.catatKehadiran = async (req, res) => {
-    const { id_pekerja, tipe_aksi, metode, fotoB64, id_lokasi } = req.body;
+    const { id_pekerja, tipe_aksi, metode, fotoB64, id_lokasi, confidence, recognized_worker } = req.body;
 
     if (!id_pekerja || !tipe_aksi) {
         return res.status(400).json({ message: 'ID Pekerja dan Tipe Aksi diperlukan.' });
@@ -138,7 +193,24 @@ exports.catatKehadiran = async (req, res) => {
                 INSERT INTO catatan_kehadiran (id_pekerja, waktu_clock_in, status_kehadiran, metode_verifikasi, foto_clock_in_path, id_lokasi)
                 VALUES (?, NOW(), ?, ?, ?, ?)`;
             await pool.query(query, [id_pekerja, status_kehadiran, metode, namaFileFoto, id_lokasi]);
-            res.status(201).json({ message: 'Clock-In berhasil dicatat!' });
+            
+            // Log activity
+            await logActivity(
+                req.user.id, 
+                ACTIVITY_TYPES.ATTENDANCE_CLOCK_IN, 
+                `Clock in berhasil dengan status ${status_kehadiran}`, 
+                req, 
+                'SUCCESS',
+                { id_pekerja, status_kehadiran, metode, id_lokasi }
+            );
+
+            // Buat response message yang informatif
+            let responseMessage = 'Clock-In berhasil dicatat!';
+            if (metode === 'Face Recognition (Auto)' && confidence && recognized_worker) {
+                responseMessage = `Clock-In berhasil! Wajah ${recognized_worker} dikenali dengan tingkat kepercayaan ${confidence}%.`;
+            }
+            
+            res.status(201).json({ message: responseMessage });
 
         } else if (tipe_aksi === 'clock_out') {
             const [clockInRecord] = await pool.query(
@@ -172,7 +244,24 @@ exports.catatKehadiran = async (req, res) => {
                 ORDER BY waktu_clock_in DESC LIMIT 1`;
 
             await pool.query(updateQuery, [status_pulang, id_pekerja]);
-            res.status(200).json({ message: 'Clock-Out berhasil dicatat!' });
+            
+            // Log activity
+            await logActivity(
+                req.user.id, 
+                ACTIVITY_TYPES.ATTENDANCE_CLOCK_OUT, 
+                `Clock out berhasil dengan status ${status_pulang}`, 
+                req, 
+                'SUCCESS',
+                { id_pekerja, status_pulang, durasiMenit }
+            );
+
+            // Buat response message yang informatif untuk clock-out
+            let responseMessage = 'Clock-Out berhasil dicatat!';
+            if (metode === 'Face Recognition (Auto)' && confidence && recognized_worker) {
+                responseMessage = `Clock-Out berhasil! Wajah ${recognized_worker} dikenali dengan tingkat kepercayaan ${confidence}%.`;
+            }
+            
+            res.status(200).json({ message: responseMessage });
         }
     } catch (error) {
         console.error("Error saat mencatat kehadiran:", error);
@@ -184,39 +273,65 @@ exports.getTodayWorkerStatus = async (req, res) => {
     try {
         const { id } = req.user; // ID Supervisor - using 'id' field from JWT payload
         
+        console.log('Fetching worker status for supervisor ID:', id);
+        
         // Check if the supervisor has any assignments
         const [assignments] = await pool.query(
             'SELECT id_lokasi FROM penugasan_pengawas WHERE id_pengguna_supervisor = ?',
             [id]
         );
         
-        // If no assignments found, return empty array
+        console.log('Supervisor assignments:', assignments);
+        
+        let query;
+        let queryParams = [];
+        
         if (assignments.length === 0) {
-            return res.json([]);
+            console.log('No assignments found for supervisor, returning all workers');
+            // If no assignments found, return all workers (fallback for development/testing)
+            query = `
+                SELECT 
+                    pk.id_pekerja, 
+                    p.nama_pengguna, 
+                    jp.nama_pekerjaan,
+                    ck.waktu_clock_in, 
+                    ck.waktu_clock_out, 
+                    ck.status_kehadiran
+                FROM pekerja pk
+                JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+                LEFT JOIN jenis_pekerjaan jp ON pk.id_jenis_pekerjaan = jp.id_jenis_pekerjaan
+                LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja AND DATE(ck.waktu_clock_in) = CURDATE()
+                WHERE p.status_pengguna = 'Aktif'
+                ORDER BY p.nama_pengguna;
+            `;
+        } else {
+            const locationIds = assignments.map(assignment => assignment.id_lokasi);
+            const placeholders = locationIds.map(() => '?').join(',');
+            
+            query = `
+                SELECT 
+                    pk.id_pekerja, 
+                    p.nama_pengguna, 
+                    jp.nama_pekerjaan,
+                    ck.waktu_clock_in, 
+                    ck.waktu_clock_out, 
+                    ck.status_kehadiran
+                FROM pekerja pk
+                JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
+                LEFT JOIN jenis_pekerjaan jp ON pk.id_jenis_pekerjaan = jp.id_jenis_pekerjaan
+                LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja AND DATE(ck.waktu_clock_in) = CURDATE()
+                WHERE pk.id_lokasi_penugasan IN (${placeholders}) 
+                AND p.status_pengguna = 'Aktif'
+                ORDER BY p.nama_pengguna;
+            `;
+            queryParams = locationIds;
         }
         
-        const locationIds = assignments.map(assignment => assignment.id_lokasi);
+        console.log('Executing query:', query);
+        console.log('Query params:', queryParams);
         
-        // Build parameterized query for multiple location IDs
-        const placeholders = locationIds.map(() => '?').join(',');
-        const query = `
-            SELECT 
-                pk.id_pekerja, 
-                p.nama_pengguna, 
-                jp.nama_pekerjaan,
-                ck.waktu_clock_in, 
-                ck.waktu_clock_out, 
-                ck.status_kehadiran
-            FROM pekerja pk
-            JOIN pengguna p ON pk.id_pengguna = p.id_pengguna
-            LEFT JOIN jenis_pekerjaan jp ON pk.id_jenis_pekerjaan = jp.id_jenis_pekerjaan
-            LEFT JOIN catatan_kehadiran ck ON pk.id_pekerja = ck.id_pekerja AND DATE(ck.waktu_clock_in) = CURDATE()
-            WHERE pk.id_lokasi_penugasan IN (${placeholders}) 
-            AND p.status_pengguna = 'Aktif'
-            ORDER BY p.nama_pengguna;
-        `;
-        
-        const [workers] = await pool.query(query, locationIds);
+        const [workers] = await pool.query(query, queryParams);
+        console.log('Found', workers.length, 'workers');
         res.json(workers);
     } catch (error) {
         console.error("Error fetching today's worker status:", error);
@@ -234,10 +349,31 @@ exports.recordAttendanceByQR = async (req, res) => {
         }
         const { id_pekerja } = workerRows[0];
 
+        let finalTipeAksi = tipeAksi;
+        
+        // Jika tipeAksi adalah 'auto', tentukan secara otomatis berdasarkan status pekerja
+        if (tipeAksi === 'auto') {
+            const [existingRecord] = await pool.query(
+                'SELECT waktu_clock_in, waktu_clock_out FROM catatan_kehadiran WHERE id_pekerja = ? AND DATE(waktu_clock_in) = CURDATE() ORDER BY waktu_clock_in DESC LIMIT 1',
+                [id_pekerja]
+            );
+            
+            if (existingRecord.length === 0) {
+                // Belum ada record hari ini, lakukan clock_in
+                finalTipeAksi = 'clock_in';
+            } else if (existingRecord[0].waktu_clock_out === null) {
+                // Sudah clock_in tapi belum clock_out
+                finalTipeAksi = 'clock_out';
+            } else {
+                // Sudah clock_in dan clock_out hari ini
+                return res.status(400).json({ message: 'Anda sudah melakukan clock-in dan clock-out hari ini.' });
+            }
+        }
+
         // Panggil fungsi catatKehadiran yang sudah ada (DRY Principle)
         req.body = {
             id_pekerja,
-            tipe_aksi: tipeAksi,
+            tipe_aksi: finalTipeAksi,
             metode: 'QR',
             id_lokasi: idLokasi
         };
@@ -245,6 +381,6 @@ exports.recordAttendanceByQR = async (req, res) => {
 
     } catch (error) {
         console.error("Error recording attendance by QR:", error);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Terjadi kesalahan pada server." });
     }
 };

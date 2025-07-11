@@ -1,7 +1,6 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const logActivity = require('../services/logService');
 
 exports.login = async (req, res) => {
   const { email, password } = req.body;
@@ -11,7 +10,7 @@ exports.login = async (req, res) => {
   }
 
   try {
-    // Query untuk mendapatkan data pengguna aktif beserta informasi pekerja dan peran
+    // Query untuk mendapatkan data pengguna aktif
     const [users] = await pool.query(
         `SELECT
            p.id_pengguna, p.password_hash, pr.nama_peran,
@@ -48,13 +47,22 @@ exports.login = async (req, res) => {
     // Generate JWT
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    // Catat aktivitas login
-    await logActivity(
-        user.id_pengguna,
-        'LOGIN',
-        `User ${user.nama_pengguna} berhasil login.`,
-        req
-    );
+    // Catat aktivitas login menggunakan skema lama
+    try {
+      await pool.query(
+        'INSERT INTO log_aktivitas (id_pengguna, tipe_aktivitas, deskripsi, waktu_aktivitas, ip_address, user_agent) VALUES (?, ?, ?, NOW(), ?, ?)',
+        [
+          user.id_pengguna,
+          'LOGIN',
+          `User ${user.nama_pengguna} berhasil login`,
+          req.ip || req.connection.remoteAddress,
+          req.get('User-Agent') || 'Unknown'
+        ]
+      );
+    } catch (logError) {
+      console.error('Error logging activity:', logError);
+      // Don't fail login if logging fails
+    }
 
     // Kirim respons dengan token dan info pengguna
     res.json({
